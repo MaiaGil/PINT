@@ -1,0 +1,2 @@
+#Para não dar commit á parta node_modules
+node_modules/
