@@ -8,4 +8,4 @@ const EmissaoCarbonoSchema = new mongoose.Schema({
   fator_emissao_co2e_per_mwh: Number
 });
 
-module.exports = mongoose.model('EmissaoCarbono', EmissaoEscopoSchema);
+module.exports = mongoose.model('EmissaoCarbono', EmissaoCarbonoSchema);

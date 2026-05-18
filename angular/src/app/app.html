@@ -1,0 +1,111 @@
+<div style="font-family: Arial, sans-serif; background-color: #f8f9fa; min-height: 100vh; display: flex; flex-direction: column;">
+  
+  <header style="background-color: #343a40; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+    <h1 style="margin: 0; font-size: 24px; cursor: pointer;" (click)="mudarSeccao('dashboard')">Painel {{ title }}</h1>
+    <button *ngIf="seccaoAtiva !== 'dashboard'" (click)="mudarSeccao('dashboard')" style="background-color: #6c757d; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold;">
+      ← Voltar ao Menu
+    </button>
+  </header>
+
+  <main style="flex: 1; padding: 30px;">
+    
+    <div *ngIf="seccaoAtiva === 'dashboard'">
+      <h2 style="color: #495057; margin-bottom: 25px;">Visão Geral do Sistema:</h2>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+        
+        <div (click)="mudarSeccao('entidades')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #007bff; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #007bff; margin: 0 0 10px 0;">🏢 1. Entidades</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.entidades }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Organizações registadas.</p>
+        </div>
+
+        <div (click)="mudarSeccao('periodos')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #20c997; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #20c997; margin: 0 0 10px 0;">📅 2. Períodos</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.periodos }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Intervalos de tempo ativos.</p>
+        </div>
+
+        <div (click)="mudarSeccao('tipos-material')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #17a2b8; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #17a2b8; margin: 0 0 10px 0;">🏷️ 3. Tipos de Material</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.tiposMaterial }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Categorias e unidades base.</p>
+        </div>
+
+        <div (click)="mudarSeccao('materias-primas')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #6f42c1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #6f42c1; margin: 0 0 10px 0;">📦 4. Matérias-Primas</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.materiasPrimas }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Registos no inventário.</p>
+        </div>
+
+        <div (click)="mudarSeccao('relatorios')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #28a745; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #28a745; margin: 0 0 10px 0;">📄 5. Relatórios</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.relatorios }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Relatórios gerados.</p>
+        </div>
+
+        <div (click)="mudarSeccao('emissoes')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #dc3545; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #dc3545; margin: 0 0 10px 0;">🔥 6. Emissões de Carbono</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.emissoes }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Pegadas carbónicas calculadas.</p>
+        </div>
+
+        <div (click)="mudarSeccao('energia-consumo')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; text-align: center; border-left: 5px solid #ffc107; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <h3 style="color: #ffc107; margin: 0 0 10px 0;">⚡ 7. Consumo de Energia</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.consumosEnergia }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Lançamentos de eletricidade/combustível.</p>
+        </div>
+
+        <div (click)="mudarSeccao('energia-mix')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid #fd7e14; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+          <h3 style="color: #fd7e14; margin: 0 0 10px 0;">🌐 8. Mix de Energia</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.mixEnergia }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Especificações de fontes renováveis.</p>
+        </div>
+
+        <div (click)="mudarSeccao('transportes')" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid #e83e8c; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+          <h3 style="color: #e83e8c; margin: 0 0 10px 0;">🚗 9. Transportes</h3>
+          <p style="font-size: 24px; font-weight: bold; color: #333; margin: 5px 0;">{{ totais.transportes }}</p>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Deslocações e frotas registadas.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'entidades'">
+      <app-entidade></app-entidade>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'periodos'">
+      <app-periodo></app-periodo>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'tipos-material'">
+      <app-tipo-material></app-tipo-material>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'materias-primas'">
+      <app-materia-prima></app-materia-prima>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'relatorios'">
+      <app-relatorio></app-relatorio>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'emissoes'">
+      <app-emissao-carbono></app-emissao-carbono>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'energia-consumo'">
+      <app-energia-consumo></app-energia-consumo>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'energia-mix'">
+      <app-energia-mix></app-energia-mix>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'transportes'">
+      <app-transporte></app-transporte>
+    </div>
+
+  </main>
+</div>

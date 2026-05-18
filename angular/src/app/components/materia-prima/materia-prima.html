@@ -1,0 +1,35 @@
+<div style="padding: 20px; font-family: Arial, sans-serif;">
+    <h2>Registar Matéria-Prima</h2>
+  
+    <div *ngIf="tiposMaterial.length === 0" style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb;">
+      ⚠️ <strong>Atenção:</strong> Não pode registar uma Matéria-Prima ainda. Por favor, vá primeiro ao menu <strong>Dados Base</strong> e crie pelo menos um <strong>Tipo de Material</strong>.
+    </div>
+  
+    <form *ngIf="tiposMaterial.length > 0" (ngSubmit)="submeterFormulario()" style="margin-bottom: 30px;">
+      
+      <label style="display:block; margin: 10px 0 5px 0;">Tipo de Material:</label>
+      <select [(ngModel)]="idTipoMaterialSelecionado" name="tipoMaterial" required style="padding: 5px; width: 320px;">
+        <option value="">-- Selecione o Tipo de Material --</option>
+        <option *ngFor="let t of tiposMaterial" [value]="t._id">
+          {{ t.nome }} ({{ t.categoria }})
+        </option>
+      </select>
+  
+      <label style="display:block; margin: 10px 0 5px 0;">Quantidade (kg):</label>
+      <input type="number" [(ngModel)]="novaMateria.quantidade_kg" name="quantidade_kg" required style="padding: 5px; width: 310px;">
+  
+      <label style="display:block; margin: 10px 0 5px 0;">Conteúdo Reciclado (%):</label>
+      <input type="number" min="0" max="100" [(ngModel)]="novaMateria.conteudo_reciclado_pct" name="conteudo_reciclado_pct" required style="padding: 5px; width: 310px;">
+  
+      <label style="display:block; margin: 10px 0 5px 0;">Intensidade Carbónica (kgCO2e/kg):</label>
+      <input type="number" step="0.01" [(ngModel)]="novaMateria.intensidade_carbonica" name="intensidade_carbonica" required style="padding: 5px; width: 310px;">
+  
+      <label style="display:block; margin: 10px 0 5px 0;">Processo de Produção:</label>
+      <input [(ngModel)]="novaMateria.processo_producao" name="processo_producao" placeholder="Ex: Extrusão, Fundição" style="padding: 5px; width: 310px;"><br><br>
+  
+      <button type="submit" style="padding: 7px 15px; background-color: #6f42c1; color: white; border: none; cursor: pointer; border-radius: 4px;">Guardar Matéria-Prima</button>
+    </form>
+  
+    <hr>
+    <h2>Inventário de Matérias-Primas</h2>
+    </div>

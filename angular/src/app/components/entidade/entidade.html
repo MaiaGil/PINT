@@ -1,0 +1,19 @@
+<div style="padding: 20px; font-family: Arial, sans-serif;">
+    <h2>Criar Nova Entidade</h2>
+    <form (ngSubmit)="submeterFormulario()" style="margin-bottom: 30px;">
+      <input [(ngModel)]="novaEntidade.nome" name="nome" placeholder="Nome" required style="display:block; margin: 5px 0; padding: 5px;"><br>
+      <input [(ngModel)]="novaEntidade.sede" name="sede" placeholder="Sede" style="display:block; margin: 5px 0; padding: 5px;"><br>
+      <input [(ngModel)]="novaEntidade.nif" name="nif" placeholder="NIF" style="display:block; margin: 5px 0; padding: 5px;"><br>
+      <input type="number" [(ngModel)]="novaEntidade.acesso_log" name="acesso_log" placeholder="Acesso Log" style="display:block; margin: 5px 0; padding: 5px;"><br>
+      <button type="submit" style="padding: 5px 10px; background-color: green; color: white; border: none; cursor: pointer;">Guardar Entidade</button>
+    </form>
+  
+    <hr>
+  
+    <h2>Lista de Entidades Existentes</h2>
+    <ul>
+      <li *ngFor="let e of entidades">
+        <strong>{{ e.nome }}</strong> - Sede: {{ e.sede }} | NIF: {{ e.nif }}
+      </li>
+    </ul>
+  </div>
