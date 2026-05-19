@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api';
@@ -11,52 +11,92 @@ import { ApiService } from '../../services/api';
   styleUrls: ['./materia-prima.css']
 })
 export class MateriaPrimaComponent implements OnInit {
+  // Arrays para preencher as listas e as dropdowns de seleção do teu HTML
   materiasPrimas: any[] = [];
-  tiposMaterial: any[] = [];
+  tiposMaterial: any[] = []; 
+  relatorios: any[] = [];
 
-  idTipoMaterialSelecionado: string = '';
+  // Variável para armazenar o ID do tipo de material selecionado na dropdown
+  idTipoMaterialSelecionado: string = ''; 
 
+  // Objeto estruturado com os nomes exatos que o teu HTML está a mapear no [(ngModel)]
   novaMateria = {
-    quantidade_kg: 0,
-    conteudo_reciclado_pct: 0,
-    intensidade_carbonica: 0,
+    id_relatorio: '',
+    nome: '',
+    quantidade_kg: null,
+    conteudo_reciclado_pct: null,
+    intensidade_carbonica: null,
     processo_producao: ''
   };
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
-    this.carregarDados();
+    // Carregamento assíncrono seguro contra o erro NG0100
+    setTimeout(() => {
+      this.carregarMateriasPrimas();
+      this.carregarTiposMaterial();
+      this.carregarRelatoriosAuxiliares();
+    }, 0);
   }
 
-  carregarDados(): void {
-    // Carrega a lista de matérias-primas já registadas
+  carregarMateriasPrimas(): void {
     this.apiService.getMateriasPrimas().subscribe({
-      next: (dados: any[]) => this.materiasPrimas = dados,
+      next: (dados: any[]) => {
+        this.materiasPrimas = dados;
+        this.cdr.detectChanges();
+      },
       error: (err: any) => console.error('Erro ao carregar matérias-primas:', err)
     });
+  }
 
-    // Carrega os tipos de material para o select/dropdown
+  carregarTiposMaterial(): void {
     this.apiService.getTiposMaterial().subscribe({
-      next: (dados: any[]) => this.tiposMaterial = dados,
+      next: (dados: any[]) => {
+        this.tiposMaterial = dados;
+        this.cdr.detectChanges();
+      },
       error: (err: any) => console.error('Erro ao carregar tipos de material:', err)
     });
   }
 
+  carregarRelatoriosAuxiliares(): void {
+    this.apiService.getRelatorios().subscribe({
+      next: (dados: any[]) => {
+        this.relatorios = dados;
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => console.error('Erro ao carregar relatórios auxiliares:', err)
+    });
+  }
+
+  // Nome da função ajustado para condizer com o (ngSubmit)="submeterFormulario()" do HTML
   submeterFormulario(): void {
-    if (!this.idTipoMaterialSelecionado) {
-      alert('Por favor, seleciona um Tipo de Material!');
+    if (!this.idTipoMaterialSelecionado || !this.novaMateria.id_relatorio || !this.novaMateria.nome) {
+      alert('Por favor, preencha todos os campos obrigatórios do formulário!');
       return;
     }
 
+    // CORREÇÃO DO ERRO TS2554: Passamos os 2 argumentos que o teu api.ts exige
     this.apiService.createMateriaPrima(this.idTipoMaterialSelecionado, this.novaMateria).subscribe({
       next: () => {
-        this.carregarDados(); // Atualiza a tabela
-        this.novaMateria = { quantidade_kg: 0, conteudo_reciclado_pct: 0, intensidade_carbonica: 0, processo_producao: '' };
+        this.carregarMateriasPrimas(); // Recarrega o histórico
+        
+        // Faz o reset completo ao formulário no ecrã
         this.idTipoMaterialSelecionado = '';
-        alert('Matéria-Prima registada com sucesso!');
+        this.novaMateria = {
+          id_relatorio: '',
+          nome: '',
+          quantidade_kg: null,
+          conteudo_reciclado_pct: null,
+          intensidade_carbonica: null,
+          processo_producao: ''
+        };
+        
+        this.cdr.detectChanges();
+        alert('Matéria-prima registada com sucesso!');
       },
-      error: (err: any) => alert('Erro ao registar matéria-prima: ' + err.message)
+      error: (err: any) => alert('Erro ao submeter matéria-prima: ' + err.message)
     });
   }
 }

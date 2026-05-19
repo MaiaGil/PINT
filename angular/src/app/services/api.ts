@@ -99,4 +99,8 @@ export class ApiService {
   createTransporte(idRelatorio: string, dados: any): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/relatorios/${idRelatorio}/transportes`, dados);
   }
+
+  createConsumoEnergia(idRelatorio: string, dados: any): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/consumos-energia/${idRelatorio}`, dados);
+  }
 }

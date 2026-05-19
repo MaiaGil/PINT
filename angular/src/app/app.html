@@ -68,6 +68,11 @@
           <p style="color: #6c757d; font-size: 13px; margin: 0;">Deslocações e frotas registadas.</p>
         </div>
 
+        <div (click)="mudarSeccao('extracao-ia')" style="background: #f3ebff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid #6f42c1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+          <h3 style="color: #6f42c1; margin: 0 0 10px 0;">🤖 10. Extração IA</h3>
+          <p style="color: #6c757d; font-size: 13px; margin: 0;">Povoar tabelas automaticamente via Inteligência Artificial.</p>
+        </div>
+
       </div>
     </div>
 
@@ -105,6 +110,10 @@
 
     <div [hidden]="seccaoAtiva !== 'transportes'">
       <app-transporte></app-transporte>
+    </div>
+
+    <div [hidden]="seccaoAtiva !== 'extracao-ia'">
+      <app-ia-extracao></app-ia-extracao>
     </div>
 
   </main>

@@ -12,6 +12,7 @@ import { TransporteComponent } from './components/transporte/transporte';
 import { PeriodoComponent } from './components/periodo/periodo';
 import { TipoMaterialComponent } from './components/tipo-material/tipo-material';
 import { MateriaPrimaComponent } from './components/materia-prima/materia-prima';
+import { IaExtracaoComponent } from './components/ia-extracao/ia-extracao';
 
 @Component({
   selector: 'app-root',
@@ -20,7 +21,8 @@ import { MateriaPrimaComponent } from './components/materia-prima/materia-prima'
     CommonModule,
     EntidadeComponent, PeriodoComponent, TipoMaterialComponent,
     MateriaPrimaComponent, RelatorioComponent, EmissaoCarbonoComponent,
-    EnergiaConsumoComponent, EnergiaMixComponent, TransporteComponent
+    EnergiaConsumoComponent, EnergiaMixComponent, TransporteComponent,
+    IaExtracaoComponent,
   ],
   templateUrl: './app.html',
   styleUrls: ['./app.css']

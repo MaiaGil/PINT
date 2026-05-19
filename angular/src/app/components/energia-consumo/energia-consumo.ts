@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api';
@@ -11,50 +11,74 @@ import { ApiService } from '../../services/api';
   styleUrls: ['./energia-consumo.css']
 })
 export class EnergiaConsumoComponent implements OnInit {
-  consumos: any[] = [];
+  consumosEnergia: any[] = [];
   relatorios: any[] = [];
+  idRelatorioSelecionado: string = ''; 
 
-  idRelatorioSelecionado: string = '';
-
+  // CORREÇÃO: Propriedades mapeadas exatamente como o teu HTML [(ngModel)] exige
   novoConsumo = {
-    quantidade: 0,
-    unidade: 'kWh' // Valor por defeito
+    tipo_energia: '',
+    quantidade: null,
+    unidade: '',
+    custo_total: null
   };
 
-  constructor(private apiService: ApiService) {}
+  constructor(private apiService: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
-    this.carregarDados();
+    // Carregamento assíncrono protetor contra o erro NG0100
+    setTimeout(() => {
+      this.carregarConsumosEnergia();
+      this.carregarRelatoriosAuxiliares();
+    }, 0);
   }
 
-  carregarDados(): void {
-    // Carrega a lista de consumos já registados
+  carregarConsumosEnergia(): void {
     this.apiService.getConsumosEnergia().subscribe({
-      next: (dados: any[]) => this.consumos = dados,
-      error: (err: any) => console.error('Erro ao carregar consumos:', err)
+      next: (dados: any[]) => {
+        this.consumosEnergia = dados;
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => console.error('Erro ao carregar consumos de energia:', err)
     });
+  }
 
-    // Carrega os relatórios para podermos associar no dropdown
-    this.apiService.getRelatorios().subscribe({
-      next: (dados: any[]) => this.relatorios = dados,
-      error: (err: any) => console.error('Erro ao carregar relatórios:', err)
-    });
+  carregarRelatoriosAuxiliares(): void {
+    if (this.apiService.getRelatorios) {
+      this.apiService.getRelatorios().subscribe({
+        next: (dados: any[]) => {
+          this.relatorios = dados;
+          this.cdr.detectChanges();
+        },
+        error: (err) => console.error(err)
+      });
+    }
   }
 
   submeterFormulario(): void {
-    if (!this.idRelatorioSelecionado) {
-      alert('Por favor, seleciona um Relatório!');
+    if (!this.idRelatorioSelecionado || !this.novoConsumo.tipo_energia || !this.novoConsumo.quantidade) {
+      alert('Por favor, preencha todos os campos obrigatórios!');
       return;
     }
 
-    this.apiService.createEnergiaConsumo(this.idRelatorioSelecionado, this.novoConsumo).subscribe({
+    // Agora o ApiService já reconhece esta função
+    this.apiService.createConsumoEnergia(this.idRelatorioSelecionado, this.novoConsumo).subscribe({
       next: () => {
-        this.carregarDados(); // Recarrega a tabela e listas
-        this.novoConsumo = { quantidade: 0, unidade: 'kWh' };
+        this.carregarConsumosEnergia(); // Atualiza o histórico no ecrã
+        
+        // Reset completo ao formulário
         this.idRelatorioSelecionado = '';
+        this.novoConsumo = { 
+          tipo_energia: '', 
+          quantidade: null, 
+          unidade: '', 
+          custo_total: null 
+        };
+        
+        this.cdr.detectChanges();
         alert('Consumo de energia registado com sucesso!');
       },
-      error: (err: any) => alert('Erro ao criar consumo de energia: ' + err.message)
+      error: (err: any) => alert('Erro ao criar consumo: ' + err.message)
     });
   }
 }
