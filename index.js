@@ -14,15 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use('/api', require('./routes/entidadeRoutes'));
-app.use('/api', require('./routes/periodoRoutes'));
-app.use('/api', require('./routes/tipoMaterialRoutes'));
-app.use('/api', require('./routes/relatorioRoutes'));
-app.use('/api', require('./routes/emissaoCarbonoRoutes'));
-app.use('/api', require('./routes/energiaConsumoRoutes'));
-app.use('/api', require('./routes/transporteRoutes'));
-app.use('/api', require('./routes/energiaMixRoutes'));
-app.use('/api', require('./routes/materiaPrimaRoutes'));
+
 app.use('/api', require('./routes/iaRoutes'));
 
 app.listen(port, () => {
