@@ -1,21 +1,25 @@
-import { Component, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IaService } from '../../services/ia'; // MUDANÇA: Importa o novo serviço isolado
+
+// CAMINHO CIRÚRGICO: Como este ficheiro está dentro de duas pastas (components/ia-extracao), 
+// ele precisa de recuar dois níveis (../../) para chegar à pasta services/ia
+import { IaService } from '../../services/ia';
 
 @Component({
   selector: 'app-ia-extracao',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './ia-extracao.html'
+  templateUrl: './ia-extracao.html',   // Sem o .component a meio
+  styleUrls: ['./ia-extracao.css']     // Sem o .component a meio
 })
-export class IaExtracaoComponent {
+export class IaExtracaoComponent { // 👈 GARANTE QUE O NOME É EXATAMENTE ESTE
+  private iaService = inject(IaService);
+  private cdr = inject(ChangeDetectorRef);
+
   textoFatura: string = '';
   logsProcessamento: string[] = [];
   carregando: boolean = false;
-
-  // MUDANÇA: Injetamos o IaService em vez do ApiService antigo
-  constructor(private iaService: IaService, private cdr: ChangeDetectorRef) {}
 
   carregarFicheiroTexto(event: any) {
     const file = event.target.files[0];
@@ -38,10 +42,9 @@ export class IaExtracaoComponent {
     this.carregando = true;
     this.logsProcessamento = [];
 
-    // MUDANÇA: Chama o método através do novo iaService
     this.iaService.enviarParaExtraDocIA(this.textoFatura).subscribe({
       next: (resposta) => {
-        this.logsProcessamento = resposta.logExplicativo;
+        this.logsProcessamento = resposta.logExplicativo || [];
         this.carregando = false;
         this.textoFatura = ''; 
         this.cdr.detectChanges();

@@ -1,44 +1,76 @@
 const { OpenAI } = require('openai');
-const Entidade = require('../models/entidadeModel');
-const Periodo = require('../models/periodoModel');
-const Relatorio = require('../models/relatorioModel');
-const ConsumoEnergia = require('../models/energiaConsumoModel');
-const EnergiaMix = require('../models/energiaMixModel');
+const Entidade = require('../models/Entidade');
+const Periodo = require('../models/Periodo');
+const Documento = require('../models/Documento');
+const Metrica = require('../models/Metrica');
+const UnidadeMedida = require('../models/UnidadeMedida');
+const Dado = require('../models/Dado');
 
-// 1. O TRUQUE: Usar a biblioteca da OpenAI, mas apontar para o servidor gratuito!
+// Inicialização da OpenAI apontada para o endpoint da Groq
 const openai = new OpenAI({ 
-    apiKey: "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", // Ex: "gsk_123abc..."
-    baseURL: "https://api.groq.com/openai/v1" // Isto desvia o pedido do ChatGPT para o Groq
+    apiKey: process.env.GROQ_API_KEY, 
+    baseURL: "https://api.groq.com/openai/v1" 
 });
 
 const extrairEGravarDados = async (req, res) => {
     try {
-        const { textoDocumento } = req.body;
+        const { textoDocumento, ficheiro_origem } = req.body;
 
         if (!textoDocumento) {
-            return res.status(400).json({ mensagem: "O texto do documento é obrigatório." });
+            return res.status(400).json({ sucesso: false, mensagem: "O texto do documento é obrigatório." });
         }
 
         const systemPrompt = `
-            És um assistente especialista em auditorias ESG e extração de dados analíticos de faturas e relatórios industriais.
-            Analisa o texto do documento fornecido pelo utilizador e extrai as informações para o formato JSON estrito abaixo.
-            Se algum dado não for encontrado no documento, deixa o campo como null ou array vazio.
-            
+            És um assistente especialista em auditorias ESG (Environmental, Social, Governance) e extração de dados analíticos.
+            Analisa o texto do documento fornecido e extrai as informações estruturadas rigorosamente no formato JSON abaixo.
+            Se algum campo opcional não for encontrado, deixa-o como null ou array vazio.
+
+            RESPOSTA OBRIGATÓRIA: Devolve APENAS o objeto JSON puro. Não incluas texto explicativo, notas ou blocos de código markdown (como \`\`\`json).
+
+            REGRAS PARA O PERÍODO:
+            - Identifica as datas de início e fim da cobertura do documento (ex: se for uma fatura de Janeiro de 2024, data_inicio é "2024-01-01" e data_fim é "2024-01-31").
+            - O campo "tipo_periodo" deve ser "Anual", "Trimestral", "Mensal" ou "Pontual".
+
+            REGRAS PARA OS DADOS/MÉTRICAS:
+            - Extrai todas as leituras quantitativas de consumo, emissões ou indicadores ESG.
+            - No array de "dimensoes", extrai propriedades contextuais como pares de chave/valor (ex: chave: "Escopo", valor: "Escopo 1").
+
             O formato do JSON de retorno deve ser estritamente este:
             {
-                "entidade": { "nome": "Nome da empresa cliente", "nif": "NIF com 9 dígitos sem espaços", "sede": "Cidade, País" },
-                "periodo": { "ano": 2024, "trimestre": 4 },
-                "relatorio": { "versao_esquema": "Número ou ID da fatura/documento" },
-                "consumos": [
-                    { "tipo": "Eletricidade ou Gás Natural ou Gasóleo", "quantidade_kwh": 12345, "custo": 123.45 }
-                ],
-                "mixEletricidade": { "percentagem_renovavel": 55 }
+                "entidade": { 
+                    "nome": "Nome oficial da empresa ou organização", 
+                    "nif": "Apenas os 9 dígitos numéricos, sem espaços", 
+                    "pais": "País correspondente", 
+                    "tipo_entidade": "Ex: Pública, Privada, PME" 
+                },
+                "periodo": { 
+                    "tipo_periodo": "Mensal",
+                    "data_inicio": "YYYY-MM-DD", 
+                    "data_fim": "YYYY-MM-DD" 
+                },
+                "documento": { 
+                    "tipo_documento": "Ex: Fatura, Relatório de Sustentabilidade, Auditoria", 
+                    "numero_documento": "Número da fatura ou identificador único do documento", 
+                    "data_emissao": "YYYY-MM-DD"
+                },
+                "dados_extraidos": [
+                    {
+                        "nome_metrica_sugerido": "Ex: Consumo de Eletricidade, Consumo de Gás Natural",
+                        "pilar": "E",
+                        "subcategoria": "Energia",
+                        "valor": 12345.67,
+                        "simbolo_unidade": "kWh",
+                        "dimensoes": [
+                            { "chave": "Tipo", "valor": "Eletricidade" }
+                        ]
+                    }
+                ]
             }
         `;
 
-        // 2. MUDANÇA DO MODELO: Usar o LLaMA 3 em vez do GPT
+        // Chamada à API da Groq usando o LLaMA 3.3
         const respostaIA = await openai.chat.completions.create({
-            model: "llama-3.3-70b-versatile", // <-- O NOVO MODELO ATUALIZADO
+            model: "llama-3.3-70b-versatile",
             response_format: { type: "json_object" }, 
             messages: [
                 { role: "system", content: systemPrompt },
@@ -46,69 +78,130 @@ const extrairEGravarDados = async (req, res) => {
             ]
         });
 
-        // O resto do teu código continua rigorosamente igual!
-        const dadosExtraidosIA = JSON.parse(respostaIA.choices[0].message.content);
+        let textoResposta = respostaIA.choices[0].message.content.trim();
+        
+        // Limpeza preventiva caso o LLM insira blocos de código markdown por engano
+        if (textoResposta.startsWith("```")) {
+            textoResposta = textoResposta.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+        }
 
+        const dadosExtraidosIA = JSON.parse(textoResposta);
         let logAcoes = [];
 
+        // 1. Processar ENTIDADE (Encontrar ou Criar)
         let entidade = await Entidade.findOne({ nif: dadosExtraidosIA.entidade.nif });
         if (!entidade) {
-            entidade = new Entidade(dadosExtraidosIA.entidade);
+            entidade = new Entidade({
+                nome: dadosExtraidosIA.entidade.nome,
+                nif: dadosExtraidosIA.entidade.nif,
+                pais: dadosExtraidosIA.entidade.pais || 'Portugal',
+                tipo_entidade: dadosExtraidosIA.entidade.tipo_entidade || 'Privada'
+            });
             await entidade.save();
-            logAcoes.push(`🏢 Entidade criada de raiz: "${entidade.nome}" (NIF: ${entidade.nif}).`);
+            logAcoes.push(`🏢 Nova entidade criada: "${entidade.nome}" (NIF: ${entidade.nif}).`);
         } else {
-            logAcoes.push(`🏢 Entidade identificada: "${entidade.nome}" reaproveitada para este relatório.`);
+            logAcoes.push(`🏢 Entidade existente mapeada: "${entidade.nome}".`);
         }
 
-        let periodo = await Periodo.findOne({ ano: dadosExtraidosIA.periodo.ano, trimestre: dadosExtraidosIA.periodo.trimestre });
+        // 2. Processar PERÍODO (Encontrar ou Criar por datas exatas)
+        let periodo = await Periodo.findOne({ 
+            data_inicio: new Date(dadosExtraidosIA.periodo.data_inicio), 
+            data_fim: new Date(dadosExtraidosIA.periodo.data_fim) 
+        });
         if (!periodo) {
-            periodo = new Periodo(dadosExtraidosIA.periodo);
+            periodo = new Periodo({
+                tipo_periodo: dadosExtraidosIA.periodo.tipo_periodo,
+                data_inicio: new Date(dadosExtraidosIA.periodo.data_inicio),
+                data_fim: new Date(dadosExtraidosIA.periodo.data_fim)
+            });
             await periodo.save();
-            logAcoes.push(`📅 Período criado: Ano ${periodo.ano} - ${periodo.trimestre}º Trimestre.`);
+            logAcoes.push(`📅 Novo Período gerado: ${dadosExtraidosIA.periodo.data_inicio} até ${dadosExtraidosIA.periodo.data_fim}.`);
         } else {
-            logAcoes.push(`📅 Período existente: Ano ${periodo.ano} - ${periodo.trimestre}º Trimestre reaproveitado.`);
+            logAcoes.push(`📅 Período existente reutilizado (ID: ${periodo._id}).`);
         }
 
-        const relatorio = new Relatorio({
+        // 3. Criar o DOCUMENTO único
+        const novoDocumento = new Documento({
             id_entidade: entidade._id,
             id_periodo: periodo._id,
-            versao_esquema: dadosExtraidosIA.relatorio.versao_esquema || 'Fatura-IA'
+            tipo_documento: dadosExtraidosIA.documento.tipo_documento || 'Fatura',
+            numero_documento: dadosExtraidosIA.documento.numero_documento || 'S/N',
+            data_emissao: dadosExtraidosIA.documento.data_emissao ? new Date(dadosExtraidosIA.documento.data_emissao) : new Date(),
+            ficheiro_origem: ficheiro_origem || 'upload_manual.txt',
+            estado: 'Processado',
+            fonte_ingestao: 'Groq-LLaMA-Extractor',
+            versao_schema: 'v2.0',
+            data_processamento: new Date()
         });
-        await relatorio.save();
-        logAcoes.push(`📄 Relatório gerado automaticamente com o código: ${relatorio.versao_esquema}.`);
+        await novoDocumento.save();
+        logAcoes.push(`📄 Documento registado: ${novoDocumento.tipo_documento} Nº ${novoDocumento.numero_documento}.`);
 
-        if (dadosExtraidosIA.consumos && dadosExtraidosIA.consumos.length > 0) {
-            for (let con of dadosExtraidosIA.consumos) {
-                const novoConsumo = new ConsumoEnergia({
-                    id_relatorio: relatorio._id,
-                    tipo_energia: con.tipo,
-                    quantidade_kwh: con.quantidade_kwh,
-                    custo_total: con.custo
-                });
-                await novoConsumo.save();
-                logAcoes.push(`⚡ Consumo de Energia adicionado: ${con.tipo} (${con.quantidade_kwh.toLocaleString()} kWh).`);
-
-                if (con.tipo.toLowerCase().includes("eletricidade") && dadosExtraidosIA.mixEletricidade?.percentagem_renovavel) {
-                    const pctRenovavel = dadosExtraidosIA.mixEletricidade.percentagem_renovavel;
-                    const novoMix = new EnergiaMix({
-                        id_energia_consumo: novoConsumo._id,
-                        fontes_renovaveis_pct: pctRenovavel,
-                        fontes_nao_renovaveis_pct: 100 - pctRenovavel
+        // 4. Iterar e Gravar as métricas no modelo de dados unificado
+        if (dadosExtraidosIA.dados_extraidos && dadosExtraidosIA.dados_extraidos.length > 0) {
+            for (let item of dadosExtraidosIA.dados_extraidos) {
+                
+                // Resolver ou criar a Unidade de Medida
+                let unidade = await UnidadeMedida.findOne({ simbolo: item.simbolo_unidade });
+                if (!unidade) {
+                    unidade = new UnidadeMedida({
+                        nome: item.simbolo_unidade,
+                        simbolo: item.simbolo_unidade,
+                        tipo_unidade: 'Definido por IA'
                     });
-                    await novoMix.save();
-                    logAcoes.push(`🌐 Mix de Energia registado: ${pctRenovavel}% Renovável detetado.`);
+                    await unidade.save();
                 }
+
+                // Resolver ou criar a Métrica de forma dinâmica (Dicionário ESG ativo)
+                let metrica = await Metrica.findOne({ nome: new RegExp(`^${item.nome_metrica_sugerido}$`, 'i') });
+                if (!metrica) {
+                    metrica = new Metrica({
+                        nome: item.nome_metrica_sugerido,
+                        descricao: `Métrica gerada dinamicamente via IA a partir do doc ${novoDocumento.numero_documento}`,
+                        pilar: item.pilar || 'E',
+                        subcategoria: item.subcategoria || 'Geral',
+                        natureza: 'Quantitativa',
+                        id_unidade_base: unidade._id,
+                        ativo: true
+                    });
+                    await metrica.save();
+                    logAcoes.push(`📊 Nova Métrica introduzida no dicionário: "${metrica.nome}".`);
+                }
+
+                // Gravar o registo analítico final na coleção Dado
+                const novoDado = new Dado({
+                    id_documento: novoDocumento._id,
+                    id_metrica: metrica._id,
+                    id_entidade: entidade._id,
+                    id_periodo: periodo._id,
+                    id_unidade_original: unidade._id,
+                    valor: item.valor,
+                    valor_convertido_base: item.valor, // Valor inicial (pode ser recalculado por workers de conversão)
+                    origem: 'Extração Automatizada (LLaMA 3.3)',
+                    estado_validacao: 'Submetido',
+                    data_registo: new Date(),
+                    dimensoes: item.dimensoes || []
+                });
+                await novoDado.save();
+                
+                logAcoes.push(`⚡ Dado ESG associado: ${metrica.nome} de ${item.valor} ${unidade.simbolo}.`);
             }
+        } else {
+            logAcoes.push(`⚠️ Nenhuns dados quantitativos válidos foram extraídos para gravação.`);
         }
 
+        // Resposta de sucesso com logs estruturados para o frontend
         res.status(201).json({
             sucesso: true,
             logExplicativo: logAcoes,
-            dados: relatorio
+            dados: {
+                id_documento: novoDocumento._id,
+                entidade: entidade.nome,
+                total_registos_adicionados: dadosExtraidosIA.dados_extraidos?.length || 0
+            }
         });
 
     } catch (error) {
-        console.error("Erro na extração IA:", error);
+        console.error("Falha no controlador de extração IA:", error);
         res.status(500).json({ sucesso: false, erro: error.message });
     }
 };
