@@ -1,14 +1,13 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
 const dadoController = require('../controllers/dadoController');
 
-router.route('/')
-    .get(dadoController.getAllDados)
-    .post(dadoController.createDado);
+// Rotas principais
+router.post('/', dadoController.criarDado);
+router.get('/', dadoController.obterDados);
 
-router.route('/:id')
-    .get(dadoController.getDado)
-    .put(dadoController.updateDado)
-    .delete(dadoController.deleteDado);
+// Rotas com ID específico
+router.get('/:id', dadoController.obterDadoPorId);
+router.put('/:id', dadoController.atualizarDado);
+router.delete('/:id', dadoController.eliminarDado);
 
 module.exports = router;

@@ -1,209 +1,256 @@
-const { OpenAI } = require('openai');
-const Entidade = require('../models/Entidade');
-const Periodo = require('../models/Periodo');
-const Documento = require('../models/Documento');
-const Metrica = require('../models/Metrica');
-const UnidadeMedida = require('../models/UnidadeMedida');
-const Dado = require('../models/Dado');
+const Groq = require("groq-sdk");
+const { v4: uuidv4 } = require("uuid");
+const mammoth = require("mammoth");
+const Tesseract = require("tesseract.js");
 
-// Inicialização da OpenAI apontada para o endpoint da Groq
-const openai = new OpenAI({ 
-    apiKey: process.env.GROQ_API_KEY, 
-    baseURL: "https://api.groq.com/openai/v1" 
-});
+const Entidade = require("../models/entidadeModel");
+const Periodo = require("../models/periodoModel");
+const Documento = require("../models/documentoModel");
+const Dado = require("../models/dadoModel");
 
-const extrairEGravarDados = async (req, res) => {
-    try {
-        const { textoDocumento, ficheiro_origem } = req.body;
+let pdf;
+try {
+	pdf = require("pdf-parse");
+} catch (e) {
+	console.warn("⚠️ pdf-parse não está instalado");
+}
 
-        if (!textoDocumento) {
-            return res.status(400).json({ sucesso: false, mensagem: "O texto do documento é obrigatório." });
-        }
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-        const systemPrompt = `
-            És um assistente especialista em auditorias ESG (Environmental, Social, Governance) e extração de dados analíticos.
-            Analisa o texto do documento fornecido e extrai as informações estruturadas rigorosamente no formato JSON abaixo.
-            Se algum campo opcional não for encontrado, deixa-o como null ou array vazio.
+const log = (msg) => console.log(`🔎 [IA] ${msg}`);
 
-            RESPOSTA OBRIGATÓRIA: Devolve APENAS o objeto JSON puro. Não incluas texto explicativo, notas ou blocos de código markdown (como \`\`\`json).
+const timeout = (ms) =>
+	new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), ms));
 
-            REGRAS PARA O PERÍODO:
-            - Identifica as datas de início e fim da cobertura do documento (ex: se for uma fatura de Janeiro de 2024, data_inicio é "2024-01-01" e data_fim é "2024-01-31").
-            - O campo "tipo_periodo" deve ser "Anual", "Trimestral", "Mensal" ou "Pontual".
-
-            REGRAS PARA OS DADOS/MÉTRICAS:
-            - Extrai todas as leituras quantitativas de consumo, emissões ou indicadores ESG.
-            - No array de "dimensoes", extrai propriedades contextuais como pares de chave/valor (ex: chave: "Escopo", valor: "Escopo 1").
-
-            O formato do JSON de retorno deve ser estritamente este:
-            {
-                "entidade": { 
-                    "nome": "Nome oficial da empresa ou organização", 
-                    "nif": "Apenas os 9 dígitos numéricos, sem espaços", 
-                    "pais": "País correspondente", 
-                    "tipo_entidade": "Ex: Pública, Privada, PME" 
-                },
-                "periodo": { 
-                    "tipo_periodo": "Mensal",
-                    "data_inicio": "YYYY-MM-DD", 
-                    "data_fim": "YYYY-MM-DD" 
-                },
-                "documento": { 
-                    "tipo_documento": "Ex: Fatura, Relatório de Sustentabilidade, Auditoria", 
-                    "numero_documento": "Número da fatura ou identificador único do documento", 
-                    "data_emissao": "YYYY-MM-DD"
-                },
-                "dados_extraidos": [
-                    {
-                        "nome_metrica_sugerido": "Ex: Consumo de Eletricidade, Consumo de Gás Natural",
-                        "pilar": "E",
-                        "subcategoria": "Energia",
-                        "valor": 12345.67,
-                        "simbolo_unidade": "kWh",
-                        "dimensoes": [
-                            { "chave": "Tipo", "valor": "Eletricidade" }
-                        ]
-                    }
-                ]
-            }
-        `;
-
-        // Chamada à API da Groq usando o LLaMA 3.3
-        const respostaIA = await openai.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
-            response_format: { type: "json_object" }, 
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: textoDocumento }
-            ]
-        });
-
-        let textoResposta = respostaIA.choices[0].message.content.trim();
-        
-        // Limpeza preventiva caso o LLM insira blocos de código markdown por engano
-        if (textoResposta.startsWith("```")) {
-            textoResposta = textoResposta.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-        }
-
-        const dadosExtraidosIA = JSON.parse(textoResposta);
-        let logAcoes = [];
-
-        // 1. Processar ENTIDADE (Encontrar ou Criar)
-        let entidade = await Entidade.findOne({ nif: dadosExtraidosIA.entidade.nif });
-        if (!entidade) {
-            entidade = new Entidade({
-                nome: dadosExtraidosIA.entidade.nome,
-                nif: dadosExtraidosIA.entidade.nif,
-                pais: dadosExtraidosIA.entidade.pais || 'Portugal',
-                tipo_entidade: dadosExtraidosIA.entidade.tipo_entidade || 'Privada'
-            });
-            await entidade.save();
-            logAcoes.push(`🏢 Nova entidade criada: "${entidade.nome}" (NIF: ${entidade.nif}).`);
-        } else {
-            logAcoes.push(`🏢 Entidade existente mapeada: "${entidade.nome}".`);
-        }
-
-        // 2. Processar PERÍODO (Encontrar ou Criar por datas exatas)
-        let periodo = await Periodo.findOne({ 
-            data_inicio: new Date(dadosExtraidosIA.periodo.data_inicio), 
-            data_fim: new Date(dadosExtraidosIA.periodo.data_fim) 
-        });
-        if (!periodo) {
-            periodo = new Periodo({
-                tipo_periodo: dadosExtraidosIA.periodo.tipo_periodo,
-                data_inicio: new Date(dadosExtraidosIA.periodo.data_inicio),
-                data_fim: new Date(dadosExtraidosIA.periodo.data_fim)
-            });
-            await periodo.save();
-            logAcoes.push(`📅 Novo Período gerado: ${dadosExtraidosIA.periodo.data_inicio} até ${dadosExtraidosIA.periodo.data_fim}.`);
-        } else {
-            logAcoes.push(`📅 Período existente reutilizado (ID: ${periodo._id}).`);
-        }
-
-        // 3. Criar o DOCUMENTO único
-        const novoDocumento = new Documento({
-            id_entidade: entidade._id,
-            id_periodo: periodo._id,
-            tipo_documento: dadosExtraidosIA.documento.tipo_documento || 'Fatura',
-            numero_documento: dadosExtraidosIA.documento.numero_documento || 'S/N',
-            data_emissao: dadosExtraidosIA.documento.data_emissao ? new Date(dadosExtraidosIA.documento.data_emissao) : new Date(),
-            ficheiro_origem: ficheiro_origem || 'upload_manual.txt',
-            estado: 'Processado',
-            fonte_ingestao: 'Groq-LLaMA-Extractor',
-            versao_schema: 'v2.0',
-            data_processamento: new Date()
-        });
-        await novoDocumento.save();
-        logAcoes.push(`📄 Documento registado: ${novoDocumento.tipo_documento} Nº ${novoDocumento.numero_documento}.`);
-
-        // 4. Iterar e Gravar as métricas no modelo de dados unificado
-        if (dadosExtraidosIA.dados_extraidos && dadosExtraidosIA.dados_extraidos.length > 0) {
-            for (let item of dadosExtraidosIA.dados_extraidos) {
-                
-                // Resolver ou criar a Unidade de Medida
-                let unidade = await UnidadeMedida.findOne({ simbolo: item.simbolo_unidade });
-                if (!unidade) {
-                    unidade = new UnidadeMedida({
-                        nome: item.simbolo_unidade,
-                        simbolo: item.simbolo_unidade,
-                        tipo_unidade: 'Definido por IA'
-                    });
-                    await unidade.save();
-                }
-
-                // Resolver ou criar a Métrica de forma dinâmica (Dicionário ESG ativo)
-                let metrica = await Metrica.findOne({ nome: new RegExp(`^${item.nome_metrica_sugerido}$`, 'i') });
-                if (!metrica) {
-                    metrica = new Metrica({
-                        nome: item.nome_metrica_sugerido,
-                        descricao: `Métrica gerada dinamicamente via IA a partir do doc ${novoDocumento.numero_documento}`,
-                        pilar: item.pilar || 'E',
-                        subcategoria: item.subcategoria || 'Geral',
-                        natureza: 'Quantitativa',
-                        id_unidade_base: unidade._id,
-                        ativo: true
-                    });
-                    await metrica.save();
-                    logAcoes.push(`📊 Nova Métrica introduzida no dicionário: "${metrica.nome}".`);
-                }
-
-                // Gravar o registo analítico final na coleção Dado
-                const novoDado = new Dado({
-                    id_documento: novoDocumento._id,
-                    id_metrica: metrica._id,
-                    id_entidade: entidade._id,
-                    id_periodo: periodo._id,
-                    id_unidade_original: unidade._id,
-                    valor: item.valor,
-                    valor_convertido_base: item.valor, // Valor inicial (pode ser recalculado por workers de conversão)
-                    origem: 'Extração Automatizada (LLaMA 3.3)',
-                    estado_validacao: 'Submetido',
-                    data_registo: new Date(),
-                    dimensoes: item.dimensoes || []
-                });
-                await novoDado.save();
-                
-                logAcoes.push(`⚡ Dado ESG associado: ${metrica.nome} de ${item.valor} ${unidade.simbolo}.`);
-            }
-        } else {
-            logAcoes.push(`⚠️ Nenhuns dados quantitativos válidos foram extraídos para gravação.`);
-        }
-
-        // Resposta de sucesso com logs estruturados para o frontend
-        res.status(201).json({
-            sucesso: true,
-            logExplicativo: logAcoes,
-            dados: {
-                id_documento: novoDocumento._id,
-                entidade: entidade.nome,
-                total_registos_adicionados: dadosExtraidosIA.dados_extraidos?.length || 0
-            }
-        });
-
-    } catch (error) {
-        console.error("Falha no controlador de extração IA:", error);
-        res.status(500).json({ sucesso: false, erro: error.message });
-    }
+const limparTexto = (t) => {
+	log("limparTexto");
+	return !t ? "" : t.replace(/\s+/g, " ").trim().substring(0, 20000);
 };
 
-module.exports = { extrairEGravarDados };
+const gerarId = (p) => {
+	const id = `${p}_${uuidv4()}`;
+	log(`gerarId -> ${id}`);
+	return id;
+};
+
+const extrairTextoFicheiro = async (file) => {
+	log("STEP FILE - início");
+
+	if (!file) throw new Error("Ficheiro inválido");
+
+	const t = file.mimetype;
+	log(`MIME TYPE: ${t}`);
+
+	if (t === "application/pdf") {
+		const d = await pdf(file.buffer);
+		return limparTexto(d.text);
+	}
+
+	if (t === "text/plain") {
+		return limparTexto(file.buffer.toString("utf-8"));
+	}
+
+	if (t.includes("wordprocessingml")) {
+		const r = await mammoth.extractRawText({ buffer: file.buffer });
+		return limparTexto(r.value);
+	}
+
+	if (["image/png", "image/jpeg", "image/jpg"].includes(t)) {
+		const o = await Tesseract.recognize(file.buffer, "por+eng");
+		return limparTexto(o.data.text);
+	}
+
+	throw new Error("Formato não suportado");
+};
+
+const gerarInboundIA = async (texto, nome = null) => {
+	log("STEP IA - início");
+
+	const systemPrompt = `Responde APENAS JSON válido.Sem markdown.Não inventes dados.Se não souber null.`;
+
+	let c;
+
+	try {
+		c = await Promise.race([
+			groq.chat.completions.create({
+				messages: [
+					{ role: "system", content: systemPrompt },
+					{ role: "user", content: `FICHEIRO:${nome || "?"}\n${texto}` }
+				],
+				model: "llama-3.3-70b-versatile",
+				temperature: 0.1,
+				max_tokens: 4000,
+				response_format: { type: "json_object" }
+			}),
+			timeout(60000)
+		]);
+	} catch (e) {
+		log("STEP IA - GROQ TIMEOUT/ERROR");
+		throw e;
+	}
+
+	log("STEP IA - resposta recebida");
+
+	let r = {};
+	try {
+		r = JSON.parse(c.choices[0].message.content || "{}");
+	} catch {
+		throw new Error("JSON inválido IA");
+	}
+
+	log("STEP IA - parse OK");
+
+	const idDoc = gerarId("doc");
+	const idEnt = gerarId("ent");
+	const idPer = gerarId("per");
+
+	return {
+		meta: {
+			documento: {
+				id_documento: idDoc,
+				tipo_documento: r?.meta?.documento?.tipo_documento || "OUTRO",
+				numero_documento: r?.meta?.documento?.numero_documento || null,
+				data_emissao: r?.meta?.documento?.data_emissao || null,
+				ficheiro_origem: nome || null
+			},
+			entidade: {
+				id_entidade: idEnt,
+				nome: r?.meta?.entidade?.nome || "UNKNOWN",
+				tipo_entidade: r?.meta?.entidade?.tipo_entidade || "OUTRO",
+				pais: r?.meta?.entidade?.pais || null,
+				nif: r?.meta?.entidade?.nif || null
+			},
+			periodo: {
+				id_periodo: idPer,
+				tipo_periodo: r?.meta?.periodo?.tipo_periodo || "MENSAL",
+				data_inicio: r?.meta?.periodo?.data_inicio || null,
+				data_fim: r?.meta?.periodo?.data_fim || null
+			},
+			versao_schema: "1.0.0"
+		},
+		dados: (r?.dados || []).map((d) => ({
+			id_dado: gerarId("dad"),
+			id_documento: idDoc,
+			id_metrica: d?.id_metrica || null,
+			id_entidade: idEnt,
+			id_periodo: idPer,
+			valor: Number(d?.valor) || 0,
+			origem: "IA"
+		}))
+	};
+};
+
+const safeUpsert = async (Model, query, data) => {
+	log(`DB UPSERT -> ${Model.modelName}`);
+	return Model.findOneAndUpdate(query, data, {
+		upsert: true,
+		new: true
+	});
+};
+
+const guardarInboundBD = async (i) => {
+	log("STEP DB - início");
+
+	const entidade = await safeUpsert(
+		Entidade,
+		{ id_entidade: i.meta.entidade.id_entidade },
+		i.meta.entidade
+	);
+
+	const periodo = await safeUpsert(
+		Periodo,
+		{ id_periodo: i.meta.periodo.id_periodo },
+		i.meta.periodo
+	);
+
+	const documento = await safeUpsert(
+		Documento,
+		{ id_documento: i.meta.documento.id_documento },
+		i.meta.documento
+	);
+
+	let dados = [];
+
+	log("STEP DB - dados");
+
+	try {
+		if (i.dados?.length) {
+			await Dado.deleteMany({ id_documento: i.meta.documento.id_documento });
+
+			dados = await Dado.insertMany(i.dados);
+		}
+	} catch (e) {
+		log("STEP DB - ERRO insertMany -> " + e.message);
+		throw e;
+	}
+
+	log("STEP DB - fim");
+
+	return { entidade, periodo, documento, dados };
+};
+
+const extrairDadosDocumentoFicheiro = async (req, res) => {
+	try {
+		log("REQUEST FILE - início");
+
+		if (!req.file)
+			return res.status(400).json({ sucesso: false, erro: "Ficheiro vazio" });
+
+		const texto = await extrairTextoFicheiro(req.file);
+		log("REQUEST FILE - texto OK");
+
+		const inbound = await gerarInboundIA(texto, req.file.originalname);
+		log("REQUEST FILE - IA OK");
+
+		const bd = await guardarInboundBD(inbound);
+		log("REQUEST FILE - BD OK");
+
+		return res.status(200).json({
+			sucesso: true,
+			mensagem: "OK",
+			bd_registos: {
+				entidade: bd.entidade.id_entidade,
+				periodo: bd.periodo.id_periodo,
+				documento: bd.documento.id_documento,
+				dados: bd.dados.length
+			}
+		});
+	} catch (e) {
+		log("ERROR FILE -> " + e.message);
+		return res.status(500).json({ sucesso: false, erro: e.message });
+	}
+};
+
+const extrairDadosDocumento = async (req, res) => {
+	try {
+		log("REQUEST TEXTO - início");
+
+		const { texto_documento } = req.body;
+
+		if (!texto_documento)
+			return res.status(400).json({ sucesso: false, erro: "Texto obrigatório" });
+
+		const inbound = await gerarInboundIA(texto_documento);
+
+		const bd = await guardarInboundBD(inbound);
+
+		return res.status(200).json({
+			sucesso: true,
+			mensagem: "OK",
+			bd_registos: {
+				entidade: bd.entidade.id_entidade,
+				periodo: bd.periodo.id_periodo,
+				documento: bd.documento.id_documento,
+				dados: bd.dados.length
+			}
+		});
+	} catch (e) {
+		log("ERROR TEXTO -> " + e.message);
+		return res.status(500).json({ sucesso: false, erro: e.message });
+	}
+};
+
+module.exports = {
+	extrairDadosDocumento,
+	extrairDadosDocumentoFicheiro
+};

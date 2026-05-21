@@ -1,0 +1,58 @@
+<div class="container dashboard-container">
+  <header>
+    <h2>📊 Dashboard de Monitorização ESG</h2>
+    <p>Visualização interativa da performance e métricas extraídas da cadeia de valor.</p>
+  </header>
+
+  <div *ngIf="aCarregar" class="loading">
+    A sincronizar dados com o motor analítico...
+  </div>
+
+  <div *ngIf="!aCarregar">
+    <div class="kpi-cards">
+      <div class="card bg-primary">
+        <h3>Total Documentos</h3>
+        <p class="valor">{{ totalDocumentos }}</p>
+        <span class="etiqueta">Processados na Base de Dados</span>
+      </div>
+      
+      <div class="card bg-success">
+        <h3>Métricas Extraídas</h3>
+        <p class="valor">{{ totalDadosExtraidos }}</p>
+        <span class="etiqueta">Prontas para Cálculo</span>
+      </div>
+
+      <div class="card bg-warning">
+        <h3>Status da IA</h3>
+        <p class="valor">Operacional</p>
+        <span class="etiqueta">LLaMA 3.3 Integrado</span>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Distribuição de Consumos Extraídos</h3>
+        <div class="chart-wrapper">
+          <canvas baseChart
+            [data]="barChartData"
+            [options]="barChartOptions"
+            [plugins]="barChartPlugins"
+            [legend]="barChartLegend"
+            type="bar">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Origem da Extração (Auditabilidade)</h3>
+        <div class="chart-wrapper">
+          <canvas baseChart
+            [data]="pieChartData"
+            [options]="pieChartOptions"
+            type="pie">
+          </canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,65 @@
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .loading {
+    padding: 20px;
+    background-color: #e3f2fd;
+    color: #1976d2;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  /* Cartões de Topo */
+  .kpi-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+
+    .card {
+      padding: 25px;
+      border-radius: 10px;
+      color: white;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      
+      h3 { font-size: 16px; margin-bottom: 10px; opacity: 0.9; }
+      .valor { font-size: 36px; font-weight: bold; margin-bottom: 5px; }
+      .etiqueta { font-size: 13px; opacity: 0.8; }
+    }
+
+    .bg-primary { background: linear-gradient(135deg, #003366, #00509e); }
+    .bg-success { background: linear-gradient(135deg, #00b894, #00d2a6); }
+    .bg-warning { background: linear-gradient(135deg, #f39c12, #f1c40f); }
+  }
+
+  /* Grelha dos Gráficos */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 30px;
+
+    .chart-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #eee;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+
+      h3 {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+
+      /* Wrapper para manter o aspeto do Chart.js controlado */
+      .chart-wrapper {
+        position: relative;
+        height: 300px;
+        width: 100%;
+      }
+    }
+  }
+}

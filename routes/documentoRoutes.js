@@ -1,14 +1,18 @@
-const express = require('express');
-const router = express.Router();
-const documentoController = require('../controllers/documentoController');
+const router=require('express').Router();
+const documentoController=require('../controllers/documentoController');
 
-router.route('/')
-    .get(documentoController.getAllDocumentos)
-    .post(documentoController.createDocumento);
+const {
+criarDocumento,
+obterDocumentos,
+obterDocumentoPorId,
+atualizarDocumento,
+eliminarDocumento
+}=documentoController;
 
-router.route('/:id')
-    .get(documentoController.getDocumento)
-    .put(documentoController.updateDocumento)
-    .delete(documentoController.deleteDocumento);
+router.post('/',criarDocumento);
+router.get('/',obterDocumentos);
+router.get('/:id',obterDocumentoPorId);
+router.put('/:id',atualizarDocumento);
+router.delete('/:id',eliminarDocumento);
 
-module.exports = router;
+module.exports=router;
