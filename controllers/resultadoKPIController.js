@@ -70,12 +70,10 @@ const criarResultadoKPI = async (req, res) => {
 // @route   GET /api/resultados-kpi
 const obterResultadosKPI = async (req, res) => {
     try {
+        // ── REMOVIDOS OS .POPULATE() QUE CAUSAVAM O ERRO 500 ──
+        // Lemos os documentos puros do MongoDB, garantindo performance máxima
         const resultados = await ResultadoKPI.find()
-            .populate('id_kpi', 'nome tipo_agregacao')
-            .populate('id_entidade', 'nome tipo_entidade pais')
-            .populate('id_periodo', 'tipo_periodo data_inicio data_fim')
-            .populate('id_unidade', 'nome simbolo')
-            .sort({ data_calculo: -1 });
+            .sort({ data_calculo: -1 }); // Mantém a ordenação pelos mais recentes
 
         res.status(200).json({
             sucesso: true,
@@ -83,7 +81,13 @@ const obterResultadosKPI = async (req, res) => {
             dados: resultados
         });
     } catch (error) {
-        res.status(500).json({ sucesso: false, erro: "Erro ao obter os resultados." });
+        // Esta linha permite-te ver no terminal caso aconteça outro problema qualquer
+        console.error("🔥 ERRO REAL NO CONTROLADOR DE RESULTADOS KPI:", error);
+        
+        res.status(500).json({ 
+            sucesso: false, 
+            erro: "Erro ao obter os resultados." 
+        });
     }
 };
 

@@ -1,37 +1,54 @@
-<div class="container dashboard-container">
-  <header>
-    <h2>📊 Dashboard de Monitorização ESG</h2>
-    <p>Visualização interativa da performance e métricas extraídas da cadeia de valor.</p>
+<div class="dashboard-wrapper-full">
+  
+  <header class="dashboard-header">
+    <div>
+      <h2>📊 Central de Sustentabilidade & Indicadores ESG</h2>
+      <p>Performance consolidada baseada em dados reais agregados na tabela de Resultados de KPIs.</p>
+    </div>
+    <div class="badge-directiva">Conformidade CSRD</div>
   </header>
 
-  <div *ngIf="aCarregar" class="loading">
-    A sincronizar dados com o motor analítico...
+  <div *ngIf="aCarregar" class="loading-wrapper">
+    <div class="spinner"></div>
+    <p>A extrair matriz de cálculos e agregações da tabela resultadokpi...</p>
   </div>
 
   <div *ngIf="!aCarregar">
+    
     <div class="kpi-cards">
-      <div class="card bg-primary">
-        <h3>Total Documentos</h3>
-        <p class="valor">{{ totalDocumentos }}</p>
-        <span class="etiqueta">Processados na Base de Dados</span>
+      
+      <div class="card esg-card card-ambient">
+        <div class="card-icon">🌱</div>
+        <h3>Pegada Carbono Consolidada</h3>
+        <p class="valor">{{ emissoesTotaisCO2 }} <span class="unidade">tCO₂e</span></p>
+        <span class="etiqueta">Resultados agregados por Período de Auditoria</span>
       </div>
       
-      <div class="card bg-success">
-        <h3>Métricas Extraídas</h3>
-        <p class="valor">{{ totalDadosExtraidos }}</p>
-        <span class="etiqueta">Prontas para Cálculo</span>
+      <div class="card esg-card card-energy">
+        <div class="card-icon">⚡</div>
+        <h3>Consumo Energético Global</h3>
+        <p class="valor">{{ consumoEnergiaTotal }} <span class="unidade">kWh</span></p>
+        <span class="etiqueta">Agregação analítica da cadeia de fornecimento</span>
       </div>
 
-      <div class="card bg-warning">
-        <h3>Status da IA</h3>
-        <p class="valor">Operacional</p>
-        <span class="etiqueta">LLaMA 3.3 Integrado</span>
+      <div class="card esg-card card-governance">
+        <div class="card-icon">🛡️</div>
+        <h3>Índice de Confiança (Auditoria)</h3>
+        <p class="valor">{{ taxaValidacaoDados }}<span class="unidade">%</span></p>
+        <div class="progress-bar-container">
+          <div class="progress-bar" [style.width.%]="taxaValidacaoDados"></div>
+        </div>
+        <span class="etiqueta">Rácio de KPIs com validação final aprovada</span>
       </div>
     </div>
 
     <div class="charts-grid">
+      
       <div class="chart-card">
-        <h3>Distribuição de Consumos Extraídos</h3>
+        <div class="chart-header">
+          <h3>KPIs Processados por Pilar de Sustentabilidade</h3>
+          <span class="subtext">Divisão quantitativa de cálculos efetuados por estado</span>
+        </div>
         <div class="chart-wrapper">
           <canvas baseChart
             [data]="barChartData"
@@ -44,7 +61,10 @@
       </div>
 
       <div class="chart-card">
-        <h3>Origem da Extração (Auditabilidade)</h3>
+        <div class="chart-header">
+          <h3>Qualidade do Fecho Contabilístico ESG</h3>
+          <span class="subtext">Percentagem de resultados da tabela por estado de validação</span>
+        </div>
         <div class="chart-wrapper">
           <canvas baseChart
             [data]="pieChartData"
@@ -54,5 +74,6 @@
         </div>
       </div>
     </div>
+
   </div>
 </div>

@@ -1,0 +1,205 @@
+<div class="container">
+
+  <header class="header">
+    <div>
+      <h1>📊 Gestão de Métricas</h1>
+      <p>Defina as métricas ESG que alimentam os KPIs de cálculo automático.</p>
+    </div>
+    <button class="btn-novo" (click)="abrirFormNovo()" [disabled]="mostrarFormulario">
+      + Nova Métrica
+    </button>
+  </header>
+
+  <div class="alert sucesso" *ngIf="mensagemSucesso">✅ {{ mensagemSucesso }}</div>
+  <div class="alert erro"    *ngIf="mensagemErro && !mostrarFormulario">❌ {{ mensagemErro }}</div>
+
+  <!-- ══ FORMULÁRIO ══════════════════════════════════ -->
+  <div class="form-card" *ngIf="mostrarFormulario">
+
+    <h2>{{ modoEdicao ? '✏️ Editar Métrica' : '➕ Nova Métrica' }}</h2>
+
+    <div class="alert erro" *ngIf="mensagemErro">❌ {{ mensagemErro }}</div>
+
+    <div class="form-grid">
+
+      <!-- NOME -->
+      <div class="campo campo-largo">
+        <label>Nome <span class="obrigatorio">*</span></label>
+        <input [(ngModel)]="form.nome" placeholder="ex: Emissões de CO2 Embutido no Aço Comprado" />
+        <small>O ID será gerado automaticamente a partir do nome.</small>
+      </div>
+
+      <!-- PILAR -->
+      <div class="campo">
+        <label>Pilar ESG <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.pilar">
+          <option value="">— Selecionar —</option>
+          <option *ngFor="let p of pilares" [value]="p">{{ p }}</option>
+        </select>
+      </div>
+
+      <!-- SUBCATEGORIA -->
+      <div class="campo">
+        <label>Subcategoria <span class="obrigatorio">*</span></label>
+        <input [(ngModel)]="form.subcategoria" placeholder="ex: Emissões, Energia, Água, Resíduos" />
+      </div>
+
+      <!-- NATUREZA -->
+      <div class="campo">
+        <label>Natureza <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.natureza">
+          <option value="">— Selecionar —</option>
+          <option *ngFor="let n of naturezas" [value]="n">{{ n }}</option>
+        </select>
+        <small>
+          INPUT = valor bruto recolhido |
+          FATOR = coeficiente de conversão |
+          KPI_BASE = base de cálculo |
+          CALCULADA = resultado derivado
+        </small>
+      </div>
+
+      <!-- UNIDADE BASE -->
+      <div class="campo">
+        <label>Unidade Base <span class="obrigatorio">*</span></label>
+
+        <div class="toggle-modo">
+          <button [class.ativo]="form.unidade_modo === 'dropdown'" (click)="trocarModoUnidade('dropdown')" type="button">📋 Lista</button>
+          <button [class.ativo]="form.unidade_modo === 'manual'"   (click)="trocarModoUnidade('manual')"   type="button">✏️ Manual</button>
+        </div>
+
+        <select *ngIf="form.unidade_modo === 'dropdown'" [(ngModel)]="form.id_unidade_base">
+          <option value="">— Selecionar unidade —</option>
+          <option *ngFor="let u of unidades" [value]="u.id_unidade">
+            {{ u.nome }} ({{ u.simbolo }})
+          </option>
+        </select>
+
+        <input *ngIf="form.unidade_modo === 'manual'"
+               [(ngModel)]="form.id_unidade_base"
+               placeholder="ex: tco2e, kwh, ton" />
+      </div>
+
+      <!-- NORMA -->
+      <div class="campo">
+        <label>Norma de Referência <span class="opcional">(opcional)</span></label>
+        <input [(ngModel)]="form.norma_referencia" placeholder="ex: GHG Protocol, ESRS E1, GRI 305" />
+      </div>
+
+      <!-- ATIVO -->
+      <div class="campo campo-toggle">
+        <label>Estado</label>
+        <label class="switch">
+          <input type="checkbox" [(ngModel)]="form.ativo" />
+          <span class="slider"></span>
+        </label>
+        <span class="estado-label">{{ form.ativo ? 'Ativa' : 'Inativa' }}</span>
+      </div>
+
+    </div>
+
+    <div class="form-acoes">
+      <button class="btn-guardar" (click)="guardar()" [disabled]="aGuardar">
+        <span *ngIf="!aGuardar">💾 Guardar</span>
+        <span *ngIf="aGuardar">⏳ A guardar...</span>
+      </button>
+      <button class="btn-cancelar" (click)="fecharFormulario()" [disabled]="aGuardar">Cancelar</button>
+    </div>
+
+  </div>
+
+  <!-- ══ FILTROS ══════════════════════════════════════ -->
+  <div class="filtros-bar" *ngIf="!aCarregar && metricas.length > 0">
+
+    <input
+      class="filtro-texto"
+      [(ngModel)]="filtroTexto"
+      (ngModelChange)="aplicarFiltros()"
+      placeholder="🔍 Pesquisar por nome ou ID..." />
+
+    <select [(ngModel)]="filtroPilar" (ngModelChange)="aplicarFiltros()">
+      <option value="">Todos os pilares</option>
+      <option *ngFor="let p of pilares" [value]="p">{{ p }}</option>
+    </select>
+
+    <select [(ngModel)]="filtroNatureza" (ngModelChange)="aplicarFiltros()">
+      <option value="">Todas as naturezas</option>
+      <option *ngFor="let n of naturezas" [value]="n">{{ n }}</option>
+    </select>
+
+    <button class="btn-limpar" (click)="limparFiltros()">✕ Limpar</button>
+
+    <span class="contagem">{{ metricasFiltradas.length }} / {{ metricas.length }}</span>
+
+  </div>
+
+  <!-- ══ TABELA ════════════════════════════════════════ -->
+  <div class="tabela-wrapper">
+
+    <div class="a-carregar" *ngIf="aCarregar">
+      <div class="loader"></div>
+      <p>A carregar métricas...</p>
+    </div>
+
+    <div class="vazio" *ngIf="!aCarregar && metricas.length === 0">
+      <p>Nenhuma métrica registada. Cria a primeira clicando em <strong>+ Nova Métrica</strong>.</p>
+    </div>
+
+    <div class="vazio" *ngIf="!aCarregar && metricas.length > 0 && metricasFiltradas.length === 0">
+      <p>Nenhum resultado para os filtros aplicados. <button class="link-btn" (click)="limparFiltros()">Limpar filtros</button></p>
+    </div>
+
+    <table *ngIf="!aCarregar && metricasFiltradas.length > 0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Pilar</th>
+          <th>Subcategoria</th>
+          <th>Natureza</th>
+          <th>Unidade Base</th>
+          <th>Norma</th>
+          <th>Estado</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of metricasFiltradas">
+          <td><code>{{ m.id_metrica }}</code></td>
+          <td>{{ m.nome }}</td>
+          <td><span class="badge-pilar" [ngClass]="corPilar(m.pilar)">{{ m.pilar }}</span></td>
+          <td>{{ m.subcategoria }}</td>
+          <td><span class="badge-natureza">{{ m.natureza }}</span></td>
+          <td>
+            {{ m.id_unidade_base?.nome ?? m.id_unidade_base }}
+            <small *ngIf="m.id_unidade_base?.simbolo">({{ m.id_unidade_base.simbolo }})</small>
+          </td>
+          <td>{{ m.norma_referencia ?? '—' }}</td>
+          <td>
+            <span class="estado" [class.ativo]="m.ativo" [class.inativo]="!m.ativo">
+              {{ m.ativo ? 'Ativa' : 'Inativa' }}
+            </span>
+          </td>
+          <td class="acoes">
+            <button class="btn-editar"   (click)="abrirFormEdicao(m)">✏️</button>
+            <button class="btn-eliminar" (click)="confirmarEliminacao(m)">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══ MODAL ELIMINAÇÃO ══════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="metricaAEliminar">
+    <div class="modal">
+      <h3>⚠️ Confirmar Eliminação</h3>
+      <p>Tens a certeza que queres eliminar a métrica <strong>{{ metricaAEliminar.nome }}</strong>?</p>
+      <p class="modal-aviso">Esta ação não pode ser revertida e pode afetar KPIs que dependem desta métrica.</p>
+      <div class="modal-acoes">
+        <button class="btn-eliminar-confirm" (click)="eliminar()">Sim, eliminar</button>
+        <button class="btn-cancelar"         (click)="cancelarEliminacao()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>

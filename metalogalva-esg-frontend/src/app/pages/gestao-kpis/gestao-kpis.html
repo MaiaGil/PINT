@@ -1,0 +1,269 @@
+<div class="container">
+
+  <header class="header">
+    <div>
+      <h1>📈 Gestão de KPIs</h1>
+      <p>Defina os indicadores de performance ESG e as suas fórmulas de cálculo.</p>
+    </div>
+    <button class="btn-novo" (click)="abrirFormNovo()" [disabled]="mostrarFormulario">
+      + Novo KPI
+    </button>
+  </header>
+
+  <!-- FEEDBACK GLOBAL -->
+  <div class="alert sucesso" *ngIf="mensagemSucesso">✅ {{ mensagemSucesso }}</div>
+  <div class="alert erro" *ngIf="mensagemErro && !mostrarFormulario">❌ {{ mensagemErro }}</div>
+
+  <!-- ════════════════════════════════════════
+       FORMULÁRIO
+  ════════════════════════════════════════ -->
+  <div class="form-card" *ngIf="mostrarFormulario">
+
+    <h2>{{ modoEdicao ? '✏️ Editar KPI' : '➕ Novo KPI' }}</h2>
+
+    <div class="alert erro" *ngIf="mensagemErro">❌ {{ mensagemErro }}</div>
+
+    <div class="form-grid">
+
+      <!-- NOME -->
+      <div class="campo">
+        <label>Nome <span class="obrigatorio">*</span></label>
+        <input [(ngModel)]="form.nome" placeholder="ex: Pegada de Carbono Total — Scope 1" />
+      </div>
+
+      <!-- TIPO AGREGAÇÃO -->
+      <div class="campo">
+        <label>Tipo de Agregação <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.tipo_agregacao">
+          <option value="">— Selecionar —</option>
+          <option *ngFor="let t of tiposAgregacao" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+
+      <!-- FÓRMULA -->
+      <!-- FÓRMULA -->
+<div class="campo campo-formula">
+    <label>Fórmula <span class="obrigatorio">*</span></label>
+
+    <!-- Sem fórmula ainda -->
+    <div *ngIf="!form.formula_ast" class="formula-vazia">
+        <p>Nenhuma fórmula definida.</p>
+        <button type="button" class="btn-iniciar-formula" (click)="iniciarFormula()">
+            ➕ Construir Fórmula
+        </button>
+    </div>
+
+    <!-- Construtor -->
+    <div *ngIf="form.formula_ast" class="formula-builder">
+
+        <!-- Preview legível -->
+        <div class="formula-preview">
+            <span class="preview-label">Preview:</span>
+            <code>{{ renderizarFormula(form.formula_ast) }}</code>
+        </div>
+
+        <!-- Árvore recursiva -->
+        <div class="formula-arvore">
+            <ng-container
+                *ngTemplateOutlet="noTemplate; context: { no: form.formula_ast, pai: null, lado: null }">
+            </ng-container>
+        </div>
+
+        <button type="button" class="btn-limpar-formula" (click)="limparFormula()">
+            🗑️ Limpar Fórmula
+        </button>
+    </div>
+</div>
+
+<!-- TEMPLATE RECURSIVO DA ÁRVORE -->
+<ng-template #noTemplate let-no="no" let-pai="pai" let-lado="lado">
+
+    <!-- NÓ FOLHA: métrica -->
+    <div *ngIf="isMetrica(no)" class="no-metrica">
+        <select [(ngModel)]="no.metrica" [name]="'m_' + no.metrica">
+            <option value="">— Selecionar métrica —</option>
+            <option *ngFor="let m of metricas" [value]="m.id_metrica">
+                {{ m.nome }}
+            </option>
+        </select>
+        <!-- Expandir para sub-operação -->
+        <button
+            *ngIf="pai"
+            type="button"
+            class="btn-no btn-expandir"
+            title="Transformar em operação"
+            (click)="expandirNo(pai, lado)">
+            ƒ
+        </button>
+    </div>
+
+    <!-- NÓ OPERAÇÃO -->
+    <div *ngIf="isOperacao(no)" class="no-operacao">
+
+        <div class="no-operacao-inner">
+
+            <!-- LADO ESQUERDO -->
+            <div class="no-filho">
+                <ng-container
+                    *ngTemplateOutlet="noTemplate; context: { no: no.left, pai: no, lado: 'left' }">
+                </ng-container>
+            </div>
+
+            <!-- OPERADOR -->
+            <div class="no-operador">
+                <select [(ngModel)]="no.op" [name]="'op_' + no.op">
+                    <option *ngFor="let o of operadores" [value]="o.valor">
+                        {{ o.simbolo }} {{ o.label }}
+                    </option>
+                </select>
+                <!-- Colapsar de volta a métrica simples -->
+                <button
+                    *ngIf="pai"
+                    type="button"
+                    class="btn-no btn-colapsar"
+                    title="Simplificar para métrica"
+                    (click)="colapsarNo(pai, lado)">
+                    ✕
+                </button>
+            </div>
+
+            <!-- LADO DIREITO -->
+            <div class="no-filho">
+                <ng-container
+                    *ngTemplateOutlet="noTemplate; context: { no: no.right, pai: no, lado: 'right' }">
+                </ng-container>
+            </div>
+
+        </div>
+    </div>
+
+</ng-template>
+
+      <!-- UNIDADE DE RESULTADO -->
+      <div class="campo campo-unidade">
+        <label>Unidade de Resultado <span class="obrigatorio">*</span></label>
+
+        <div class="toggle-modo">
+          <button
+            [class.ativo]="form.unidade_modo === 'dropdown'"
+            (click)="trocarModoUnidade('dropdown')"
+            type="button">
+            📋 Lista
+          </button>
+          <button
+            [class.ativo]="form.unidade_modo === 'manual'"
+            (click)="trocarModoUnidade('manual')"
+            type="button">
+            ✏️ Manual
+          </button>
+        </div>
+
+        <select *ngIf="form.unidade_modo === 'dropdown'" [(ngModel)]="form.id_unidade_resultado">
+          <option value="">— Selecionar unidade —</option>
+          <option *ngFor="let u of unidades" [value]="u.id_unidade">
+            {{ u.nome }} ({{ u.simbolo }})
+          </option>
+        </select>
+
+        <input
+          *ngIf="form.unidade_modo === 'manual'"
+          [(ngModel)]="form.id_unidade_resultado"
+          placeholder="ex: tco2e, kwh, eur" />
+      </div>
+
+      <!-- NORMA -->
+      <div class="campo">
+        <label>Norma de Referência <span class="opcional">(opcional)</span></label>
+        <input [(ngModel)]="form.norma_referencia" placeholder="ex: GRI 305-1, ESRS E1-6" />
+      </div>
+
+      <!-- ATIVO -->
+      <div class="campo campo-toggle">
+        <label>Estado</label>
+        <label class="switch">
+          <input type="checkbox" [(ngModel)]="form.ativo" />
+          <span class="slider"></span>
+        </label>
+        <span class="estado-label">{{ form.ativo ? 'Ativo' : 'Inativo' }}</span>
+      </div>
+
+    </div>
+
+    <div class="form-acoes">
+      <button class="btn-guardar" (click)="guardar()" [disabled]="aGuardar">
+        <span *ngIf="!aGuardar">💾 Guardar</span>
+        <span *ngIf="aGuardar">⏳ A guardar...</span>
+      </button>
+      <button class="btn-cancelar" (click)="fecharFormulario()" [disabled]="aGuardar">
+        Cancelar
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════
+       TABELA
+  ════════════════════════════════════════ -->
+  <div class="tabela-wrapper">
+
+    <div class="a-carregar" *ngIf="aCarregar">
+      <div class="loader"></div>
+      <p>A carregar KPIs...</p>
+    </div>
+
+    <div class="vazio" *ngIf="!aCarregar && kpis.length === 0">
+      <p>Nenhum KPI registado. Cria o primeiro clicando em <strong>+ Novo KPI</strong>.</p>
+    </div>
+
+    <table *ngIf="!aCarregar && kpis.length > 0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Agregação</th>
+          <th>Unidade</th>
+          <th>Norma</th>
+          <th>Estado</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let kpi of kpis">
+          <td><code>{{ kpi.id_kpi }}</code></td>
+          <td>{{ kpi.nome }}</td>
+          <td><span class="badge">{{ kpi.tipo_agregacao }}</span></td>
+          <td>
+            {{ kpi.id_unidade_resultado?.nome ?? kpi.id_unidade_resultado }}
+            <small *ngIf="kpi.id_unidade_resultado?.simbolo">({{ kpi.id_unidade_resultado.simbolo }})</small>
+          </td>
+          <td>{{ kpi.norma_referencia ?? '—' }}</td>
+          <td>
+            <span class="estado" [class.ativo]="kpi.ativo" [class.inativo]="!kpi.ativo">
+              {{ kpi.ativo ? 'Ativo' : 'Inativo' }}
+            </span>
+          </td>
+          <td class="acoes">
+            <button class="btn-editar" (click)="abrirFormEdicao(kpi)">✏️ Editar</button>
+            <button class="btn-eliminar" (click)="confirmarEliminacao(kpi)">🗑️ Eliminar</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       MODAL CONFIRMAR ELIMINAÇÃO
+  ════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="kpiAEliminar">
+    <div class="modal">
+      <h3>⚠️ Confirmar Eliminação</h3>
+      <p>Tens a certeza que queres eliminar o KPI <strong>{{ kpiAEliminar.nome }}</strong>?</p>
+      <p class="modal-aviso">Esta ação não pode ser revertida.</p>
+      <div class="modal-acoes">
+        <button class="btn-eliminar" (click)="eliminar()">Sim, eliminar</button>
+        <button class="btn-cancelar" (click)="cancelarEliminacao()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -1,65 +1,96 @@
-.dashboard-container {
-  max-width: 1200px;
-  margin: 0 auto;
 
-  .loading {
-    padding: 20px;
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border-radius: 6px;
-    font-weight: 500;
-  }
+.dashboard-wrapper-full {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 40px;
+    box-sizing: border-box;
+}
 
-  /* Cartões de Topo */
-  .kpi-cards {
+/* ── HEADER CORPORATIVO ──────────────────────── */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 20px;
+}
+.dashboard-header h2 { font-size: 26px; color: #1e293b; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.5px; }
+.dashboard-header p { color: #64748b; font-size: 14px; margin: 0; }
+.badge-directiva {
+    background-color: #e0f2fe; color: #0369a1; padding: 6px 16px;
+    border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+}
+
+/* ── LOADING SPINNER ─────────────────────────────────── */
+.loading-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 0;
+    color: #475569;
+}
+.spinner {
+    width: 44px; height: 44px;
+    border: 4px solid #cbd5e1; border-top-color: #0284c7;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── GRELHA DE CARDS EXPANSÍVEL ──────────────────────── */
+.kpi-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+.esg-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 26px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    position: relative;
+    overflow: hidden;
+}
+.card-icon { position: absolute; top: 22px; right: 24px; font-size: 26px; opacity: 0.8; }
+.esg-card h3 { font-size: 13px; color: #64748b; margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.esg-card .valor { font-size: 36px; font-weight: 700; color: #0f172a; margin: 0 0 8px; font-family: monospace; }
+.esg-card .unidade { font-size: 16px; color: #64748b; font-weight: 500; margin-left: 4px; }
+.esg-card .etiqueta { font-size: 12px; color: #94a3b8; display: block; }
 
-    .card {
-      padding: 25px;
-      border-radius: 10px;
-      color: white;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      
-      h3 { font-size: 16px; margin-bottom: 10px; opacity: 0.9; }
-      .valor { font-size: 36px; font-weight: bold; margin-bottom: 5px; }
-      .etiqueta { font-size: 13px; opacity: 0.8; }
-    }
+.card-ambient { border-top: 5px solid #2ecc71; }
+.card-energy { border-top: 5px solid #f1c40f; }
+.card-governance { border-top: 5px solid #3498db; }
 
-    .bg-primary { background: linear-gradient(135deg, #003366, #00509e); }
-    .bg-success { background: linear-gradient(135deg, #00b894, #00d2a6); }
-    .bg-warning { background: linear-gradient(135deg, #f39c12, #f1c40f); }
-  }
+.progress-bar-container { background: #e2e8f0; border-radius: 10px; height: 6px; margin-bottom: 12px; overflow: hidden; width: 100%; }
+.progress-bar { background: #3498db; height: 100%; border-radius: 10px; transition: width 0.6s ease-in-out; }
 
-  /* Grelha dos Gráficos */
-  .charts-grid {
+/* ── GRELHA DE GRÁFICOS ULTRA WIDE FLUIDA ─────────────── */
+.charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+    gap: 28px;
+}
+@media (max-width: 1200px) {
+    .charts-grid { grid-template-columns: 1fr; }
+}
 
-    .chart-card {
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      border: 1px solid #eee;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+.chart-card {
+    background: #ffffff;
+    padding: 26px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.01);
+}
+.chart-header { margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px; }
+.chart-header h3 { font-size: 16px; color: #1e293b; margin: 0 0 4px; font-weight: 600; }
+.chart-header .subtext { font-size: 12px; color: #94a3b8; }
 
-      h3 {
-        font-size: 16px;
-        color: #333;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid #f0f0f0;
-      }
-
-      /* Wrapper para manter o aspeto do Chart.js controlado */
-      .chart-wrapper {
-        position: relative;
-        height: 300px;
-        width: 100%;
-      }
-    }
-  }
+.chart-wrapper {
+    position: relative;
+    height: 360px; /* Gráficos maiores e com mais detalhe visual */
+    width: 100%;
 }

@@ -1,0 +1,216 @@
+<div class="container">
+
+  <header class="header">
+    <div>
+      <h1>🗃️ Auditoria de Dados Brutos</h1>
+      <p>Reveja, audite e altere a totalidade dos registos de consumos e emissões.</p>
+    </div>
+  </header>
+
+  <div class="alert sucesso" *ngIf="mensagemSucesso">✅ {{ mensagemSucesso }}</div>
+  <div class="alert erro" *ngIf="mensagemErro && !mostrarFormulario">❌ {{ mensagemErro }}</div>
+
+  <div class="form-card" *ngIf="mostrarFormulario">
+    <h2>✏️ Detalhe Integral do Registo (<code>{{ dadoEmEdicao.id_dado }}</code>)</h2>
+    
+    <div class="alert erro" *ngIf="mensagemErro">❌ {{ mensagemErro }}</div>
+
+<h3 class="seccao-titulo">🔗 Relacionamentos</h3>
+    <div class="form-grid mb-4">
+      <div class="campo">
+        <label>ID Documento (Fatura)</label>
+        <input type="text" [(ngModel)]="form.id_documento" placeholder="ID (Opcional)" />
+      </div>
+      
+      <div class="campo">
+        <label>Métrica <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.id_metrica">
+          <option value="">— Selecionar Métrica —</option>
+          <option *ngFor="let m of metricas" [value]="m.id_metrica">
+            {{ m.nome }} ({{ m.id_metrica }})
+          </option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Entidade <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.id_entidade">
+          <option value="">— Selecionar Entidade —</option>
+          <option *ngFor="let e of entidades" [value]="e.id_entidade">
+            {{ e.nome }}
+          </option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Período <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.id_periodo">
+          <option value="">— Selecionar Período —</option>
+          <option *ngFor="let p of periodos" [value]="p.id_periodo">
+            {{ p.id_periodo }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <h3 class="seccao-titulo">📏 Valores e Conversões</h3>
+    <div class="form-grid mb-4">
+      <div class="campo">
+        <label>Valor Original <span class="obrigatorio">*</span></label>
+        <input type="number" [(ngModel)]="form.valor" step="0.01" />
+      </div>
+      
+      <div class="campo">
+        <label>Unidade Original</label>
+        <select [(ngModel)]="form.id_unidade_original">
+          <option value="">— Nenhuma —</option>
+          <option *ngFor="let u of unidades" [value]="u.id_unidade">
+            {{ u.nome }} ({{ u.simbolo }})
+          </option>
+        </select>
+      </div>
+      
+      <div class="campo">
+        <label>Fator de Conversão</label>
+        <input type="text" [(ngModel)]="form.id_fator" placeholder="ID Fator (Opcional)" />
+      </div>
+      
+      <div class="campo">
+        <label>Valor Base (Convertido)</label>
+        <input type="number" [(ngModel)]="form.valor_convertido_base" step="0.01" />
+      </div>
+      
+      <div class="campo">
+        <label>Unidade Base Esperada</label>
+        <select [(ngModel)]="form.id_unidade_base_esperada">
+          <option value="">— Nenhuma —</option>
+          <option *ngFor="let u of unidades" [value]="u.id_unidade">
+            {{ u.nome }} ({{ u.simbolo }})
+          </option>
+        </select>
+      </div>
+    </div>
+    <h3 class="seccao-titulo">🛡️ Validação & Auditoria</h3>
+    <div class="form-grid">
+      <div class="campo">
+        <label>Origem do Dado <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.origem">
+          <option *ngFor="let o of origensValidas" [value]="o">{{ o }}</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Estado de Validação <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.estado_validacao">
+          <option *ngFor="let est of estadosValidos" [value]="est">{{ est }}</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Data Registo</label>
+        <input type="text" [value]="dadoEmEdicao.data_registo | date:'medium'" disabled class="input-desativado" />
+      </div>
+      <div class="campo">
+        <label>Data Validação</label>
+        <input type="text" [value]="dadoEmEdicao.data_validacao ? (dadoEmEdicao.data_validacao | date:'medium') : 'Não validado'" disabled class="input-desativado" />
+      </div>
+
+      <div class="campo campo-largo">
+        <label>Observação / Justificação</label>
+        <input type="text" [(ngModel)]="form.observacao" placeholder="Informação adicional ou justificação de alterações..." />
+      </div>
+    </div>
+
+    <div class="form-acoes">
+      <button class="btn-guardar" (click)="guardar()" [disabled]="aGuardar">
+        <span *ngIf="!aGuardar">💾 Guardar Alterações Integrais</span>
+        <span *ngIf="aGuardar">⏳ A atualizar BD...</span>
+      </button>
+      <button class="btn-cancelar" (click)="fecharFormulario()" [disabled]="aGuardar">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="filtros-bar" *ngIf="!aCarregar && dados.length > 0">
+    <input
+      class="filtro-texto"
+      [(ngModel)]="filtroTexto"
+      (ngModelChange)="aplicarFiltros()"
+      placeholder="🔍 Pesquisar ID, Métrica, Entidade..." />
+
+    <select [(ngModel)]="filtroEstado" (ngModelChange)="aplicarFiltros()">
+      <option value="">Todos os Estados</option>
+      <option *ngFor="let e of estadosValidos" [value]="e">{{ e }}</option>
+    </select>
+
+    <select [(ngModel)]="filtroOrigem" (ngModelChange)="aplicarFiltros()">
+      <option value="">Todas as Origens</option>
+      <option *ngFor="let o of origensValidas" [value]="o">{{ o }}</option>
+    </select>
+
+    <button class="btn-limpar" (click)="limparFiltros()">✕ Limpar</button>
+    <span class="contagem">{{ dadosFiltrados.length }} / {{ dados.length }}</span>
+  </div>
+
+  <div class="tabela-wrapper">
+    <div class="a-carregar" *ngIf="aCarregar">
+      <div class="loader"></div>
+      <p>A carregar registos da base de dados...</p>
+    </div>
+
+    <div class="vazio" *ngIf="!aCarregar && dados.length === 0">
+      <p>Nenhum dado registado. Extrai um documento para popular a base de dados.</p>
+    </div>
+
+    <table *ngIf="!aCarregar && dadosFiltrados.length > 0">
+      <thead>
+        <tr>
+          <th>Origem</th>
+          <th>Métrica</th>
+          <th>Entidade</th>
+          <th>Período</th>
+          <th>Valor</th>
+          <th>Base</th>
+          <th>Estado</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let d of dadosFiltrados">
+          <td><span class="badge-origem">{{ d.origem }}</span></td>
+          
+          <td><strong>{{ d.id_metrica }}</strong></td>
+          <td>{{ d.id_entidade }}</td>
+          <td>{{ d.id_periodo }}</td>
+          
+          <td><code>{{ d.valor }}</code> <small>{{ d.id_unidade_original ?? '' }}</small></td>
+          <td>
+            <span *ngIf="d.valor_convertido_base"><code>{{ d.valor_convertido_base }}</code> <small>{{ d.id_unidade_base_esperada ?? '' }}</small></span>
+            <span *ngIf="!d.valor_convertido_base" class="text-muted">—</span>
+          </td>
+
+          <td>
+            <span class="badge-estado" [ngClass]="corEstado(d.estado_validacao)">
+              {{ d.estado_validacao }}
+            </span>
+          </td>
+
+          <td class="acoes">
+            <button class="btn-editar" (click)="abrirFormEdicao(d)" title="Detalhe completo">✏️</button>
+            <button class="btn-eliminar" (click)="confirmarEliminacao(d)" title="Eliminar">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-overlay" *ngIf="dadoAEliminar">
+    <div class="modal">
+      <h3>⚠️ Eliminar Registo</h3>
+      <p>Tens a certeza que queres eliminar o dado referente a <strong>{{ dadoAEliminar.id_metrica }}</strong>?</p>
+      <div class="modal-acoes">
+        <button class="btn-eliminar-confirm" (click)="eliminar()">Sim, apagar da BD</button>
+        <button class="btn-cancelar" (click)="cancelarEliminacao()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>

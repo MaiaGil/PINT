@@ -3,25 +3,29 @@ const mongoose = require('mongoose');
 const unidadeMedidaSchema = new mongoose.Schema({
     id_unidade: { 
         type: String, 
-        required: true, 
+        required: [true, 'O ID da unidade é obrigatório.'],
         unique: true,
-        description: "Chave primária (PK) da unidade de medida"
+        trim: true,
+        uppercase: true
     },
     nome: { 
         type: String, 
-        required: true,
-        description: "Nome por extenso da unidade (ex: Kilowatt-hora, Metro Cúbico)"
+        required: [true, 'O nome da unidade é obrigatório.'],
+        trim: true
     },
     simbolo: { 
         type: String, 
-        required: true,
-        description: "Símbolo da unidade (ex: kWh, m3, L)"
+        required: [true, 'O símbolo da unidade é obrigatório.'],
+        trim: true
     },
     tipo_unidade: { 
         type: String, 
-        required: true,
-        enum: ['ENERGIA', 'MASSA', 'VOLUME', 'EMISSAO', 'RACIO', 'PERCENTAGEM', 'MONETARIO', 'TEMPO']
-    },
+        required: [true, 'O tipo de unidade é obrigatório.'],
+        enum: {
+            values: ['ENERGIA', 'MASSA', 'VOLUME', 'EMISSOES', 'RACIO', 'PERCENTAGEM', 'MONETARIO', 'TEMPO'],
+            message: 'O tipo "{VALUE}" não é válido.'
+        }
+    }
 }, {
     timestamps: true
 });

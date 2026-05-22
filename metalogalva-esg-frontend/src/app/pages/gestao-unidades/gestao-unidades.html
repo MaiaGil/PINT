@@ -1,0 +1,140 @@
+<div class="container">
+
+  <header class="header">
+    <div>
+      <h1>📏 Gestão de Unidades</h1>
+      <p>Defina as unidades de medida base (kWh, Toneladas, Litros) utilizadas no sistema.</p>
+    </div>
+    <button class="btn-novo" (click)="abrirFormNovo()" [disabled]="mostrarFormulario">
+      + Nova Unidade
+    </button>
+  </header>
+
+  <div class="alert sucesso" *ngIf="mensagemSucesso">✅ {{ mensagemSucesso }}</div>
+  <div class="alert erro"    *ngIf="mensagemErro && !mostrarFormulario">❌ {{ mensagemErro }}</div>
+
+  <div class="form-card" *ngIf="mostrarFormulario">
+
+    <h2>{{ modoEdicao ? '✏️ Editar Unidade' : '➕ Nova Unidade' }}</h2>
+
+    <div class="alert erro" *ngIf="mensagemErro">❌ {{ mensagemErro }}</div>
+
+    <div class="form-grid">
+
+      <div class="campo campo-largo">
+        <label>Nome da Unidade <span class="obrigatorio">*</span></label>
+        <input [(ngModel)]="form.nome" placeholder="ex: Quilowatt-hora, Tonelada, Litro" />
+      </div>
+
+      <div class="campo">
+        <label>Símbolo <span class="obrigatorio">*</span></label>
+        <input [(ngModel)]="form.simbolo" placeholder="ex: kWh, t, L" />
+      </div>
+
+      <div class="campo">
+        <label>Tipo de Grandeza <span class="obrigatorio">*</span></label>
+        <select [(ngModel)]="form.tipo_unidade">
+          <option value="">— Selecionar —</option>
+          <option *ngFor="let t of tiposUnidade" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+
+      <div class="campo campo-toggle">
+        <label>Estado</label>
+        <label class="switch">
+          <input type="checkbox" [(ngModel)]="form.ativo" />
+          <span class="slider"></span>
+        </label>
+        <span class="estado-label">{{ form.ativo ? 'Ativa' : 'Inativa' }}</span>
+      </div>
+
+    </div>
+
+    <div class="form-acoes">
+      <button class="btn-guardar" (click)="guardar()" [disabled]="aGuardar">
+        <span *ngIf="!aGuardar">💾 Guardar</span>
+        <span *ngIf="aGuardar">⏳ A guardar...</span>
+      </button>
+      <button class="btn-cancelar" (click)="fecharFormulario()" [disabled]="aGuardar">Cancelar</button>
+    </div>
+
+  </div>
+
+  <div class="filtros-bar" *ngIf="!aCarregar && unidades.length > 0">
+
+    <input
+      class="filtro-texto"
+      [(ngModel)]="filtroTexto"
+      (ngModelChange)="aplicarFiltros()"
+      placeholder="🔍 Pesquisar por nome, símbolo ou ID..." />
+
+    <select [(ngModel)]="filtroTipo" (ngModelChange)="aplicarFiltros()">
+      <option value="">Todos os tipos</option>
+      <option *ngFor="let t of tiposUnidade" [value]="t">{{ t }}</option>
+    </select>
+
+    <button class="btn-limpar" (click)="limparFiltros()">✕ Limpar</button>
+
+    <span class="contagem">{{ unidadesFiltradas.length }} / {{ unidades.length }}</span>
+
+  </div>
+
+  <div class="tabela-wrapper">
+
+    <div class="a-carregar" *ngIf="aCarregar">
+      <div class="loader"></div>
+      <p>A carregar unidades de medida...</p>
+    </div>
+
+    <div class="vazio" *ngIf="!aCarregar && unidades.length === 0">
+      <p>Nenhuma unidade registada. Cria a primeira clicando em <strong>+ Nova Unidade</strong>.</p>
+    </div>
+
+    <div class="vazio" *ngIf="!aCarregar && unidades.length > 0 && unidadesFiltradas.length === 0">
+      <p>Nenhum resultado para os filtros aplicados. <button class="link-btn" (click)="limparFiltros()">Limpar filtros</button></p>
+    </div>
+
+    <table *ngIf="!aCarregar && unidadesFiltradas.length > 0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Símbolo</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of unidadesFiltradas">
+          <td><code>{{ u.id_unidade }}</code></td>
+          <td><strong>{{ u.nome }}</strong></td>
+          <td><span class="badge-simbolo">{{ u.simbolo }}</span></td>
+          <td><span class="badge-tipo" [ngClass]="corTipo(u.tipo_unidade)">{{ u.tipo_unidade }}</span></td>
+          <td>
+            <span class="estado" [class.ativo]="u.ativo" [class.inativo]="!u.ativo">
+              {{ u.ativo ? 'Ativa' : 'Inativa' }}
+            </span>
+          </td>
+          <td class="acoes">
+            <button class="btn-editar"   (click)="abrirFormEdicao(u)" title="Editar">✏️</button>
+            <button class="btn-eliminar" (click)="confirmarEliminacao(u)" title="Eliminar">🗑️</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal-overlay" *ngIf="unidadeAEliminar">
+    <div class="modal">
+      <h3>⚠️ Confirmar Eliminação</h3>
+      <p>Tens a certeza que queres eliminar a unidade <strong>{{ unidadeAEliminar.nome }} ({{ unidadeAEliminar.simbolo }})</strong>?</p>
+      <p class="modal-aviso">Esta ação falhará se a unidade já estiver a ser usada numa Métrica ou num Dado recolhido.</p>
+      <div class="modal-acoes">
+        <button class="btn-eliminar-confirm" (click)="eliminar()">Sim, eliminar</button>
+        <button class="btn-cancelar"         (click)="cancelarEliminacao()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>

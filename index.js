@@ -52,6 +52,7 @@ app.use('/api/kpi-composicoes',require('./routes/kpiComposicaoRoutes'));
 app.use('/api/resultados-kpi',require('./routes/resultadoKpiRoutes'));
 app.use('/api/resultado-kpi-dados',require('./routes/resultadoKpiDadoRoutes'));
 app.use('/api/ia',require('./routes/iaRoutes'));
+app.use('/api/exportar',require('./routes/exportRoutes'));
 
 app.use((req,res)=>{
 res.status(404).json({

@@ -61,17 +61,12 @@ const criarDado = async (req, res) => {
     }
 };
 
-// @desc    Listar todos os dados (com relacionamentos para o Dashboard)
+// @desc    Listar todos os dados (sem bloqueios de populate)
 // @route   GET /api/dados
 const obterDados = async (req, res) => {
     try {
-        // A magia acontece aqui: o populate vai traduzir os IDs em objetos reais
+        // Removidos os 5 .populate() que causavam o crash do Mongoose
         const dados = await Dado.find()
-            .populate('id_metrica', 'nome pilar subcategoria')
-            .populate('id_entidade', 'nome tipo_entidade')
-            .populate('id_periodo', 'tipo_periodo data_inicio data_fim')
-            .populate('id_unidade_original', 'nome simbolo')
-            .populate('id_unidade_base_esperada', 'simbolo')
             .sort({ data_registo: -1 }); // Traz os mais recentes primeiro
 
         res.status(200).json({
@@ -80,6 +75,7 @@ const obterDados = async (req, res) => {
             dados: dados
         });
     } catch (error) {
+        console.error("🔥 ERRO REAL EM OBTER DADOS:", error); // Adicionado para segurança
         res.status(500).json({ sucesso: false, erro: "Erro ao obter os dados registados." });
     }
 };
@@ -88,11 +84,8 @@ const obterDados = async (req, res) => {
 // @route   GET /api/dados/:id
 const obterDadoPorId = async (req, res) => {
     try {
-        const dado = await Dado.findOne({ id_dado: req.params.id })
-            .populate('id_metrica', 'nome pilar subcategoria')
-            .populate('id_entidade', 'nome tipo_entidade')
-            .populate('id_periodo', 'tipo_periodo')
-            .populate('id_unidade_original', 'nome simbolo');
+        // Removidos os .populate() aqui também
+        const dado = await Dado.findOne({ id_dado: req.params.id });
         
         if (!dado) {
             return res.status(404).json({ sucesso: false, mensagem: "Dado não encontrado." });
@@ -100,62 +93,81 @@ const obterDadoPorId = async (req, res) => {
 
         res.status(200).json({ sucesso: true, dados: dado });
     } catch (error) {
+        console.error("🔥 ERRO REAL EM OBTER DADO POR ID:", error);
         res.status(500).json({ sucesso: false, erro: "Erro ao procurar o dado." });
     }
 };
 
-// @desc    Atualizar um dado existente (Ex: Mudar estado para VALIDADO)
-// @route   PUT /api/dados/:id
 const atualizarDado = async (req, res) => {
     try {
-        const opcoes = { new: true, runValidators: true }; 
-        
-        // Se a validação for alterada para VALIDADO, podemos registar a data
-        if (req.body.estado_validacao === 'VALIDADO') {
+        // 1. Proteção: Impedimos alterações aos IDs estruturais
+        delete req.body.id_dado;
+        delete req.body._id;
+
+        // 2. Lógica de negócio: Registar data exata se o estado mudar para VALIDADO
+        if (req.body.estado_validacao === 'VALIDADO' && !req.body.data_validacao) {
             req.body.data_validacao = new Date();
         }
 
+        // 3. Query Nativa: Usamos o $set para alterar SÓ os campos enviados,
+        // garantindo que não substituímos o documento inteiro acidentalmente.
+        const queryUpdate = { $set: req.body };
+        const opcoes = { new: true, runValidators: true };
+
         const dadoAtualizado = await Dado.findOneAndUpdate(
             { id_dado: req.params.id },
-            req.body,
+            queryUpdate,
             opcoes
-        )
-        .populate('id_metrica', 'nome pilar')
-        .populate('id_entidade', 'nome');
+        );
+        // NOTA: Removi os .populate() que tinhas aqui para evitar os crashes 
+        // de CastError (Erro 500) que apanhámos nos KPIs!
 
         if (!dadoAtualizado) {
-            return res.status(404).json({ sucesso: false, mensagem: "Dado não encontrado para atualização." });
+            return res.status(404).json({ 
+                sucesso: false, 
+                mensagem: "Dado não encontrado para atualização." 
+            });
         }
 
         res.status(200).json({
             sucesso: true,
-            mensagem: "💾 Registo de dado atualizado com sucesso!",
+            mensagem: "💾 Valores atualizados diretamente na Base de Dados!",
             dados: dadoAtualizado
         });
+
     } catch (error) {
+        console.error("🔥 ERRO REAL NA QUERY DE UPDATE (DADOS):", error);
         if (error.name === 'ValidationError') {
             return res.status(400).json({ sucesso: false, erro: error.message });
         }
-        res.status(500).json({ sucesso: false, erro: "Erro ao atualizar o dado." });
+        res.status(500).json({ sucesso: false, erro: "Erro ao executar a query de atualização." });
     }
 };
 
-// @desc    Eliminar um dado
+// @desc    Eliminar um dado (Drop do documento nativo)
 // @route   DELETE /api/dados/:id
 const eliminarDado = async (req, res) => {
     try {
-        const dadoEliminado = await Dado.findOneAndDelete({ id_dado: req.params.id });
+        // Query de eliminação direta ao nível do documento
+        const dadoEliminado = await Dado.findOneAndDelete({ 
+            id_dado: req.params.id 
+        });
 
         if (!dadoEliminado) {
-            return res.status(404).json({ sucesso: false, mensagem: "Dado não encontrado para eliminação." });
+            return res.status(404).json({ 
+                sucesso: false, 
+                mensagem: "Dado não encontrado para eliminação." 
+            });
         }
 
         res.status(200).json({
             sucesso: true,
-            mensagem: `💾 Dado '${req.params.id}' removido com sucesso.`
+            mensagem: `🗑️ Dado '${req.params.id}' apagado definitivamente da base de dados.`
         });
+
     } catch (error) {
-        res.status(500).json({ sucesso: false, erro: "Erro ao eliminar o dado." });
+        console.error("🔥 ERRO REAL NA QUERY DE DELETE (DADOS):", error);
+        res.status(500).json({ sucesso: false, erro: "Erro ao executar a query de eliminação." });
     }
 };
 

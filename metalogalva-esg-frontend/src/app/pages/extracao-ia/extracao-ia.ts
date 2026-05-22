@@ -1,169 +1,202 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api';
-import { HttpEventType } from '@angular/common/http';
+import { Subscription, interval } from 'rxjs';
+import { takeWhile } from 'rxjs/operators';
+
+type Modo = 'fornecedor' | 'empresa';
 
 @Component({
-	selector: 'app-extracao-ia',
-	standalone: true,
-	imports: [CommonModule, FormsModule],
-	templateUrl: './extracao-ia.html',
-	styleUrls: ['./extracao-ia.css']
+    selector: 'app-extracao-ia',
+    standalone: true,
+    imports: [CommonModule, FormsModule],
+    templateUrl: './extracao-ia.html',
+    styleUrls: ['./extracao-ia.css']
 })
-export class ExtracaoIaComponent {
+export class ExtracaoIaComponent implements OnDestroy {
 
-	textoDocumento = '';
-	ficheiroSelecionado: File | null = null;
+    modo: Modo = 'fornecedor';
 
-	aProcessar = false;
-	progressoUpload = 0;
+    textoDocumento = '';
+    ficheiroSelecionado: File | null = null;
 
-	resultadoIA: any = null;
-	mensagemErro = '';
+    aProcessar = false;
+    progressoUpload = 0;
 
-	textoExtraido = '';
-	inboundJson: any = null;
+    resultadoIA: any = null;
+    mensagemErro = '';
+    inboundJson: any = null;
 
-	constructor(private apiService: ApiService) {}
+    private sub: Subscription | null = null;
+    private fakeProgressSub: Subscription | null = null;
 
-	// =========================
-	// PROCESSAR TEXTO
-	// =========================
-	processarDocumento(): void {
-		if (!this.textoDocumento.trim()) return;
+    constructor(private apiService: ApiService) {}
 
-		this.iniciarProcessamento();
+    ngOnDestroy(): void {
+        this.sub?.unsubscribe();
+        this.fakeProgressSub?.unsubscribe();
+    }
 
-		this.apiService.extrairDocumentoIA(this.textoDocumento).subscribe({
-			next: (resposta) => {
-				this.definirResposta(resposta);
-				this.pararProcessamento();
-			},
-			error: (erro) => {
-				this.lidarComErro(erro);
-				this.pararProcessamento();
-			}
-		});
-	}
+    selecionarModo(m: Modo): void {
+        this.modo = m;
+        this.limparResultado();
+    }
 
-	// =========================
-	// FILE SELECT
-	// =========================
-	onFileSelected(event: any): void {
-		const file: File = event.target.files?.[0];
+    // =========================
+    // PROCESSAR TEXTO
+    // =========================
+    processarDocumento(): void {
+        if (!this.textoDocumento.trim()) return;
 
-		if (file) {
-			this.ficheiroSelecionado = file;
-			this.mensagemErro = '';
-		}
-	}
+        this.iniciarProcessamento();
+        this.iniciarFakeProgress();
 
-	// =========================
-	// UPLOAD FILE
-	// =========================
-	processarUpload(): void {
-		if (!this.ficheiroSelecionado) return;
+        const pedido$ = this.modo === 'empresa'
+            ? this.apiService.extrairDocumentoIAEmpresa(this.textoDocumento)
+            : this.apiService.extrairDocumentoIA(this.textoDocumento);
 
-		this.iniciarProcessamento();
+        this.sub = pedido$.subscribe({
+            next: (resposta) => {
+                this.pararFakeProgress();
+                this.definirResposta(resposta);
+                this.pararProcessamento();
+            },
+            error: (erro) => {
+                this.pararFakeProgress();
+                this.lidarComErro(erro);
+            }
+        });
+    }
 
-		this.apiService.uploadDocumentoIAComProgresso(this.ficheiroSelecionado).subscribe({
-			next: (evento: any) => {
+    // =========================
+    // FILE SELECT
+    // =========================
+    onFileSelected(event: any): void {
+        const file: File = event.target.files?.[0];
+        if (file) {
+            this.ficheiroSelecionado = file;
+            this.mensagemErro = '';
+        }
+    }
 
-				// progresso upload
-				if (evento?.tipo === 'progresso') {
-					this.progressoUpload = evento.progresso ?? 0;
-					return;
-				}
+    // =========================
+    // UPLOAD — chamada simples sem reportProgress
+    // =========================
+    processarUpload(): void {
+        if (!this.ficheiroSelecionado) return;
 
-				// resposta final HTTP
-				if (evento?.type === HttpEventType.Response) {
-					this.definirResposta(evento.body);
-					this.progressoUpload = 100;
-					this.ficheiroSelecionado = null;
-					this.pararProcessamento();
-				}
-			},
-			error: (erro) => {
-				this.lidarComErro(erro);
-				this.pararProcessamento();
-			}
-		});
-	}
+        this.iniciarProcessamento();
+        this.iniciarFakeProgress();
 
-	// =========================
-	// RESPOSTA
-	// =========================
-	private definirResposta(resposta: any): void {
-		this.resultadoIA = resposta;
+        const pedido$ = this.modo === 'empresa'
+            ? this.apiService.uploadDocumentoIAEmpresa(this.ficheiroSelecionado)
+            : this.apiService.uploadDocumentoIA(this.ficheiroSelecionado);
 
-		this.inboundJson = resposta?.inbound_json ?? null;
-		this.textoExtraido = resposta?.texto_extraido ?? '';
-	}
+        this.sub = pedido$.subscribe({
+            next: (resposta) => {
+                this.pararFakeProgress();
+                this.definirResposta(resposta);
+                this.progressoUpload = 100;
+                this.ficheiroSelecionado = null;
+                this.pararProcessamento();
+            },
+            error: (erro) => {
+                this.pararFakeProgress();
+                this.lidarComErro(erro);
+            }
+        });
+    }
 
-	// =========================
-	// STATES
-	// =========================
-	private iniciarProcessamento(): void {
-		this.aProcessar = true;
-		this.resultadoIA = null;
-		this.inboundJson = null;
-		this.textoExtraido = '';
-		this.mensagemErro = '';
-		this.progressoUpload = 0;
-	}
+    // =========================
+    // FAKE PROGRESS
+    // Avança até 90% enquanto aguarda resposta do servidor.
+    // O salto para 100% é feito manualmente ao receber resposta.
+    // =========================
+    private iniciarFakeProgress(): void {
+        this.progressoUpload = 0;
 
-	private pararProcessamento(): void {
-		this.aProcessar = false;
-	}
+        this.fakeProgressSub = interval(600)
+            .pipe(takeWhile(() => this.progressoUpload < 90))
+            .subscribe(() => {
+                // desacelera à medida que se aproxima de 90%
+                const restante = 90 - this.progressoUpload;
+                this.progressoUpload += Math.max(1, Math.floor(restante * 0.12));
+            });
+    }
 
-	// =========================
-	// ERROS
-	// =========================
-	private lidarComErro(erro: any): void {
-		console.error('ERRO IA:', erro);
+    private pararFakeProgress(): void {
+        this.fakeProgressSub?.unsubscribe();
+        this.fakeProgressSub = null;
+    }
 
-		this.mensagemErro =
-			erro?.error?.erro ||
-			erro?.error?.mensagem ||
-			'Erro ao processar documento com IA.';
+    // =========================
+    // RESPOSTA
+    // =========================
+    private definirResposta(resposta: any): void {
+        this.resultadoIA = resposta;
+        this.inboundJson = resposta?.inbound_json ?? null;
+    }
 
-		this.progressoUpload = 0;
-		this.aProcessar = false;
-	}
+    // =========================
+    // STATES
+    // =========================
+    private iniciarProcessamento(): void {
+        this.aProcessar = true;
+        this.resultadoIA = null;
+        this.inboundJson = null;
+        this.mensagemErro = '';
+        this.progressoUpload = 0;
+    }
 
-	// =========================
-	// UI HELPERS
-	// =========================
-	limparResultado(): void {
-		this.resultadoIA = null;
-		this.inboundJson = null;
-		this.textoExtraido = '';
-		this.mensagemErro = '';
-		this.progressoUpload = 0;
-		this.ficheiroSelecionado = null;
-		this.aProcessar = false;
-	}
+    private pararProcessamento(): void {
+        this.aProcessar = false;
+    }
 
-	formatarJson(obj: any): string {
-		return JSON.stringify(obj, null, 2);
-	}
+    // =========================
+    // ERROS
+    // =========================
+    private lidarComErro(erro: any): void {
+        console.error('ERRO IA:', erro);
+        this.mensagemErro =
+            erro?.error?.erro ||
+            erro?.error?.mensagem ||
+            'Erro ao processar documento com IA.';
+        this.progressoUpload = 0;
+        this.aProcessar = false;
+    }
 
-	descarregarInbound(): void {
-		if (!this.inboundJson) return;
+    // =========================
+    // UI HELPERS
+    // =========================
+    limparResultado(): void {
+        this.sub?.unsubscribe();
+        this.pararFakeProgress();
+        this.resultadoIA = null;
+        this.inboundJson = null;
+        this.mensagemErro = '';
+        this.progressoUpload = 0;
+        this.ficheiroSelecionado = null;
+        this.aProcessar = false;
+        this.textoDocumento = '';
+    }
 
-		const blob = new Blob(
-			[JSON.stringify(this.inboundJson, null, 2)],
-			{ type: 'application/json' }
-		);
+    formatarJson(obj: any): string {
+        return JSON.stringify(obj, null, 2);
+    }
 
-		const url = window.URL.createObjectURL(blob);
+    descarregarInbound(): void {
+        if (!this.inboundJson) return;
 
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = 'inbound.json';
-		a.click();
-
-		window.URL.revokeObjectURL(url);
-	}
+        const blob = new Blob(
+            [JSON.stringify(this.inboundJson, null, 2)],
+            { type: 'application/json' }
+        );
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inbound.json';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
 }
