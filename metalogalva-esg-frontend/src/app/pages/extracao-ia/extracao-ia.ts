@@ -129,13 +129,21 @@ export class ExtracaoIaComponent implements OnDestroy {
         this.fakeProgressSub?.unsubscribe();
         this.fakeProgressSub = null;
     }
-
-    // =========================
-    // RESPOSTA
+// =========================
+    // RESPOSTA (Versão Corrigida e Flexível)
     // =========================
     private definirResposta(resposta: any): void {
         this.resultadoIA = resposta;
-        this.inboundJson = resposta?.inbound_json ?? null;
+        
+        // Tenta apanhar o inbound quer venha em snake_case, camelCase ou dentro do objeto de dados
+        this.inboundJson = 
+            resposta?.inbound_json || 
+            resposta?.inboundJson || 
+            resposta?.dados?.inbound_json || 
+            resposta?.dados?.inboundJson || 
+            null;
+
+        console.log('📦 Inbound JSON capturado no Frontend:', this.inboundJson);
     }
 
     // =========================
