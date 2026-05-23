@@ -10,7 +10,7 @@
       <div class="filter-group">
         <label>Entidade</label>
         <select [(ngModel)]="filtroEntidade" (change)="atualizarFiltros()">
-          <option value="">— Todas as Entidades —</option>
+          <option value="">— Visão Global Corporativa —</option>
           <option *ngFor="let ent of listaEntidades" [value]="ent.id_entidade">{{ ent.nome }}</option>
         </select>
       </div>
@@ -37,48 +37,49 @@
 
   <div *ngIf="aCarregar" class="loading-state">
     <div class="spinner"></div>
-    <p>A cruzar chaves primárias e a processar matriz de Scope 1 e Scope 3...</p>
+    <p>A compilar estrutura dinâmica da Dashboard...</p>
   </div>
 
   <div *ngIf="!aCarregar" class="dashboard-content-grid">
     
     <div class="kpi-cards-row">
-      <div class="kpi-card-industrial highlight-blue">
-        <div class="kpi-meta">KPI INDUSTRIAL</div>
-        <h3>Intensidade Carbónica do Aço</h3>
-        <p class="valor">{{ kpiIntensidadeAco?.valor_calculado }} <span class="uni">tCO₂e / ton</span></p>
+      <div class="kpi-card-industrial" *ngFor="let kpi of kpisDinamicos" [ngClass]="kpi.cor">
+        <div class="kpi-meta">{{ kpi.meta }}</div>
+        <h3>{{ kpi.titulo }}</h3>
+        <p class="valor">{{ kpi.valor }} <span class="uni">{{ kpi.unidade }}</span></p>
         <div class="card-footer-audit">
-          <span class="badge" [ngClass]="kpiIntensidadeAco?.estado_validacao?.toLowerCase()">{{ kpiIntensidadeAco?.estado_validacao }}</span>
-          <span class="date">Cálculo: {{ kpiIntensidadeAco?.data_calculo | date:'yyyy-MM-dd' }}</span>
-        </div>
-      </div>
-
-      <div class="kpi-card-industrial highlight-green">
-        <div class="kpi-meta">LOGÍSTICA / ESCOPO 3</div>
-        <h3>Pegada Carbónica Logística</h3>
-        <p class="valor">{{ kpiPegadaLogistica?.valor_calculado }} <span class="uni">tCO₂e / ton</span></p>
-        <div class="card-footer-audit">
-          <span class="badge" [ngClass]="kpiPegadaLogistica?.estado_validacao?.toLowerCase()">{{ kpiPegadaLogistica?.estado_validacao }}</span>
-          <span class="date">Cálculo: {{ kpiPegadaLogistica?.data_calculo | date:'yyyy-MM-dd' }}</span>
+          <span class="badge" [ngClass]="kpi.estado.replace(' ', '-').toLowerCase()">{{ kpi.estado }}</span>
+          <span class="date">Atualizado: {{ kpi.data | date:'HH:mm' }}</span>
         </div>
       </div>
     </div>
 
-    <div class="charts-dual-row">
+    <div class="charts-dual-row" style="grid-template-columns: 1fr 1fr 1fr; display: grid; gap: 24px;">
+      
       <div class="chart-box">
         <div class="box-header">
-          <h3>📊 Valores Brutos Extraídos por Métrica Base</h3>
-          <p>Soma total convertida para a unidade base esperada no armazém de dados.</p>
+          <h3>📊 Métricas Base (Escala < 5000)</h3>
+          <p>Consumos de menor escala em unidade base.</p>
         </div>
         <div class="canvas-holder">
-          <canvas baseChart [data]="barChartData" [options]="barChartOptions" type="bar"></canvas>
+          <canvas baseChart [data]="barChartDataAbaixo5000" [options]="barChartOptions" type="bar"></canvas>
         </div>
       </div>
 
       <div class="chart-box">
         <div class="box-header">
-          <h3>🎯 Distribuição de Emissões: Scope 1 vs Scope 3</h3>
-          <p>Mapeamento automático baseado na origem do fluxo (Interno vs Cadeia de Valor).</p>
+          <h3>📈 Grandes Volumes (Escala >= 5000)</h3>
+          <p>Consumos e volumes de massa crítica.</p>
+        </div>
+        <div class="canvas-holder">
+          <canvas baseChart [data]="barChartDataAcima5000" [options]="barChartOptions" type="bar"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <div class="box-header">
+          <h3>🎯 Escopo: Scope 1 vs Scope 3</h3>
+          <p>Metalogalva (Interno) vs Fornecedores (Externo).</p>
         </div>
         <div class="canvas-holder">
           <canvas baseChart [data]="donutChartData" [options]="donutChartOptions" type="doughnut"></canvas>
@@ -86,11 +87,10 @@
       </div>
     </div>
 
-    <div class="tables-dual-row">
-      
+    <div class="tables-dual-row" style="margin-top: 24px;">
       <div class="table-box">
         <div class="box-header">
-          <h3>🛡️ Matriz de Rastreabilidade e Linhagem (Linhagem de Dados)</h3>
+          <h3>🛡️ Matriz de Rastreabilidade</h3>
         </div>
         <div class="table-scroll">
           <table class="esg-table">
@@ -116,9 +116,9 @@
         </div>
       </div>
 
-      <div class="table-box">
+      <div class="table-box" style="margin-top: 24px;">
         <div class="box-header">
-          <h3>📄 Painel de Ingestão de Faturas e Documentos</h3>
+          <h3>📄 Ingestão de Documentos</h3>
         </div>
         <div class="table-scroll">
           <table class="esg-table">
@@ -139,13 +139,12 @@
                 <td>{{ doc.emissor }}</td>
                 <td>{{ doc.data | date:'yyyy-MM-dd' }}</td>
                 <td><span class="source-tag">{{ doc.fonte }}</span></td>
-                <td><span class="status-pill validados">{{ doc.estado }}</span></td>
+                <td><span class="status-pill validado">{{ doc.estado }}</span></td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-
     </div>
 
   </div>
