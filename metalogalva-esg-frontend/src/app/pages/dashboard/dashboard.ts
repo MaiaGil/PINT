@@ -1,5 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration, ChartOptions } from 'chart.js';
 import { ApiService } from '../../services/api';
@@ -9,139 +10,190 @@ import { finalize } from 'rxjs/operators';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, BaseChartDirective],
+  imports: [CommonModule, FormsModule, BaseChartDirective],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css']
 })
 export class DashboardComponent implements OnInit {
-  
-  // ── CARDS DE INDICADORES REAIS (DA TABELA RESULTADOKPI) ────
-  emissoesTotaisCO2: number = 0;   // tCO2e Totais calculadas
-  consumoEnergiaTotal: number = 0; // kWh Totais calculados
-  taxaValidacaoDados: number = 0;  // % de KPIs já validados pela auditoria
-  aCarregar: boolean = true;
 
-  // 📊 GRÁFICO 1: KPIs por Pilar de Sustentabilidade
-  public barChartLegend = true;
-  public barChartPlugins = [];
+  aCarregar = true;
+
+  // ── LISTAS DE SUPORTE PARA FILTROS ────────────────────────
+  listaEntidades: any[] = [];
+  listaPeriodos: any[] = [];
+  
+  // ── FILTROS GLOBAIS (PONTO 1) ─────────────────────────────
+  filtroEntidade: string = '';
+  filtroPeriodo: string = '';
+  filtroEstado: string = '';
+
+  // ── DADOS BRUTOS DA BASE DE DADOS ─────────────────────────
+  todosResultados: any[] = [];
+  todosDados: any[] = [];
+  todosDocumentos: any[] = [];
+  todasMetricas: any[] = [];
+
+  // ── CARDS DE KPIs REAIS (PONTO 2) ─────────────────────────
+  kpiIntensidadeAco: any = null; // KPI_01 ou similar
+  kpiPegadaLogistica: any = null; // KPI_02 ou similar
+
+  // ── TABELAS DE RASTREABILIDADE (PONTOS 4 E 5) ──────────────
+  tabelaRastreabilidade: any[] = [];
+  painelDocumentos: any[] = [];
+
+  // 📊 GRÁFICO 1: Dados de Origem por Métrica (PONTO 3)
   public barChartData: ChartConfiguration<'bar'>['data'] = {
-    labels: ['Ambiental (E)', 'Social (S)', 'Governança (G)'],
-    datasets: [
-      { data: [0, 0, 0], label: 'Métricas/KPIs Pendentes', backgroundColor: '#f39c12', borderRadius: 4 },
-      { data: [0, 0, 0], label: 'KPIs Auditados e Validados', backgroundColor: '#2ecc71', borderRadius: 4 }
-    ]
+    labels: [],
+    datasets: [{ data: [], label: 'Valor Base Extraído', backgroundColor: '#3498db', borderRadius: 4 }]
   };
   public barChartOptions: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
-    scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
+    scales: { y: { beginAtZero: true } }
   };
 
-  // 🥧 GRÁFICO 2: Estado de Validação Geral dos Resultados
-  public pieChartOptions: ChartOptions<'pie'> = {
+  // 🍩 GRÁFICO 2: Separação Scope 1 vs Scope 3 (PONTO 6)
+  public donutChartData: ChartConfiguration<'doughnut'>['data'] = {
+    labels: ['Scope 1 (Frota Própria - Interno)', 'Scope 3 (Fornecedores + Logística - Externo)'],
+    datasets: [{ data: [0, 0], backgroundColor: ['#2ecc71', '#e74c3c'] }]
+  };
+  public donutChartOptions: ChartOptions<'doughnut'> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { position: 'bottom' } }
   };
-  public pieChartData: ChartConfiguration<'pie'>['data'] = {
-    labels: ['VALIDADO', 'PENDENTE', 'ESTIMADO', 'REJEITADO'],
-    datasets: [
-      { data: [0, 0, 0, 0], backgroundColor: ['#2ecc71', '#f1c40f', '#3498db', '#e74c3c'] }
-    ]
-  };
 
   constructor(
-    private apiService: ApiService,
+    private api: ApiService,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
-    this.carregarDadosCalculados();
+    this.carregarDadosMestres();
   }
 
-  carregarDadosCalculados() {
+  carregarDadosMestres(): void {
     this.aCarregar = true;
 
-    // Dispara pedidos paralelos: Resultados de KPIs calculados e tabela de suporte de KPIs
     forkJoin({
-      respostaResultados: this.apiService.obterResultadosKPI(), // Garante que tens esta rota configurada no teu api.ts
-      respostaKpisGlobais: this.apiService.obterKPIs()
+      resultados: this.api.obterResultadosKPI(),
+      dados: this.api.obterDados(),
+      documentos: this.api.obterDocumentos(),
+      metricas: this.api.obterMetricas(),
+      entidades: this.api.obterEntidades(),
+      periodos: this.api.obterPeriodos()
     }).pipe(
       finalize(() => {
         this.aCarregar = false;
-        this.cdr.detectChanges(); // Elimina o loading na hora
+        this.cdr.detectChanges();
       })
     ).subscribe({
-      next: ({ respostaResultados, respostaKpisGlobais }) => {
-        const resultados = respostaResultados.dados || [];
-        const kpisDefinidos = respostaKpisGlobais.dados || [];
+      next: (res: any) => {
+        this.todosResultados = res.resultados?.dados || [];
+        this.todosDados = res.dados?.dados || [];
+        this.todosDocumentos = res.documentos?.dados || [];
+        this.todasMetricas = res.metricas?.dados || [];
+        this.listaEntidades = res.entidades?.dados || [];
+        this.listaPeriodos = res.periodos?.dados || [];
 
-        // 1. Criar dicionário para descobrir o Pilar associado a cada id_kpi
-        const mapaKpis = new Map<string, string>();
-        kpisDefinidos.forEach((k: any) => {
-          mapaKpis.set(k.id_kpi, k.pilar?.toUpperCase() || 'AMBIENTAL');
-        });
-
-        let totalValidados = 0;
-        let co2Acumulado = 0;
-        let kwhAcumulado = 0;
-
-        // Contadores do gráfico de pilares
-        let eVal = 0, ePend = 0;
-        let sVal = 0, sPend = 0;
-        let gVal = 0, gPend = 0;
-
-        // Contadores do gráfico circular (estados do teu enum)
-        let statusVal = 0, statusPend = 0, statusEst = 0, statusRej = 0;
-
-        // 2. Varrer a tabela resultadokpi e processar métricas agregadas
-        resultados.forEach((res: any) => {
-          const pilar = mapaKpis.get(res.id_kpi) || 'AMBIENTAL';
-          const estado = res.estado_validacao?.toUpperCase() || 'PENDENTE';
-
-          if (estado === 'VALIDADO') totalValidados++;
-
-          // Acumulação de valores base para os Cards principais de ESG
-          // Verifica se o KPI está relacionado com CO2 ou se usa a tua unidade de emissões do mongosh
-          if (res.id_kpi?.toLowerCase().includes('co2') || res.id_unidade === 'TCO2E') {
-            co2Acumulado += (res.valor_calculado || 0);
-          } else if (res.id_kpi?.toLowerCase().includes('ener') || res.id_unidade === 'KWH') {
-            kwhAcumulado += (res.valor_calculado || 0);
-          }
-
-          // Distribuir quantidades para o Gráfico de Barras por Pilar
-          if (pilar === 'AMBIENTAL' || pilar === 'E') {
-            if (estado === 'VALIDADO') eVal++; else ePend++;
-          } else if (pilar === 'SOCIAL' || pilar === 'S') {
-            if (estado === 'VALIDADO') sVal++; else sPend++;
-          } else if (pilar === 'GOVERNANCA' || pilar === 'GOVERNANÇA' || pilar === 'G') {
-            if (estado === 'VALIDADO') gVal++; else gPend++;
-          }
-
-          // Distribuir quantidades para o Gráfico Circular de Estados Reais
-          if (estado === 'VALIDADO') statusVal++;
-          else if (estado === 'PENDENTE') statusPend++;
-          else if (estado === 'ESTIMADO') statusEst++;
-          else if (estado === 'REJEITADO') statusRej++;
-        });
-
-        // 3. Fixar os dados reais agregados nos cartões do topo
-        this.emissoesTotaisCO2 = parseFloat(co2Acumulado.toFixed(2));
-        this.consumoEnergiaTotal = parseFloat(kwhAcumulado.toFixed(2));
-        this.taxaValidacaoDados = resultados.length > 0 ? parseFloat(((totalValidados / resultados.length) * 100).toFixed(1)) : 0;
-
-        // 4. Injetar matrizes atualizadas no Chart.js
-        this.barChartData.datasets[0].data = [ePend, sPend, gPend];
-        this.barChartData.datasets[1].data = [eVal, sVal, gVal];
-        this.pieChartData.datasets[0].data = [statusVal, statusPend, statusEst, statusRej];
-
-        // Quebrar referências antigas para forçar atualização reativa instantânea
-        this.barChartData = { ...this.barChartData };
-        this.pieChartData = { ...this.pieChartData };
+        this.processarDashboard();
       },
-      error: (err) => {
-        console.error('❌ Falha ao processar matriz de resultados do KPI:', err);
+      error: (err) => console.error('❌ Erro crítico ao carregar ecossistema ESG:', err)
+    });
+  }
+
+  // Chamar sempre que um filtro global for alterado
+  atualizarFiltros(): void {
+    this.processarDashboard();
+  }
+
+  processarDashboard(): void {
+    // 1. Criar Mapas de Tradução Célere em Memória
+    const mapaMetricas = new Map(this.todasMetricas.map(m => [m.id_metrica, m]));
+    const mapaEntidades = new Map(this.listaEntidades.map(e => [e.id_entidade, e]));
+    const mapaDocumentos = new Map(this.todosDocumentos.map(d => [d.id_documento, d]));
+
+    // 2. FILTRAGEM DOS DADOS BASE
+    const resultadosFiltrados = this.todosResultados.filter(r => {
+      return (!this.filtroEntidade || r.id_entidade === this.filtroEntidade) &&
+             (!this.filtroPeriodo || r.id_periodo === this.filtroPeriodo) &&
+             (!this.filtroEstado || r.estado_validacao === this.filtroEstado);
+    });
+
+    const dadosFiltrados = this.todosDados.filter(d => {
+      return (!this.filtroEntidade || d.id_entidade === this.filtroEntidade) &&
+             (!this.filtroPeriodo || d.id_periodo === this.filtroPeriodo);
+    });
+
+    // 3. ATRIBUIR OS CARDS DE KPIs (PONTO 2)
+    // Procuramos os IDs lógicos guardados na tabela de resultados
+    this.kpiIntensidadeAco = resultadosFiltrados.find(r => r.id_kpi?.toLowerCase().includes('aco') || r.id_kpi?.toLowerCase().includes('aço')) || 
+                             resultadosFiltrados[0] || { valor_calculado: 0.493, estado_validacao: 'SIMULADO', data_calculo: new Date() };
+    
+    this.kpiPegadaLogistica = resultadosFiltrados.find(r => r.id_kpi?.toLowerCase().includes('log') || r.id_kpi?.toLowerCase().includes('frota')) || 
+                              resultadosFiltrados[1] || { valor_calculado: 0.231, estado_validacao: 'SIMULADO', data_calculo: new Date() };
+
+    // 4. GRÁFICO DE BARRAS: Valores brutos por métrica (PONTO 3)
+    const metricasAcumuladas = new Map<string, number>();
+    dadosFiltrados.forEach(d => {
+      const metricaNome = mapaMetricas.get(d.id_metrica)?.nome || d.id_metrica || 'Métrica';
+      const totalAtual = metricasAcumuladas.get(metricaNome) || 0;
+      metricasAcumuladas.set(metricaNome, totalAtual + (d.valor_convertido_base || d.valor || 0));
+    });
+
+    this.barChartData.labels = Array.from(metricasAcumuladas.keys());
+    this.barChartData.datasets[0].data = Array.from(metricasAcumuladas.values());
+    this.barChartData = { ...this.barChartData };
+
+    // 5. GRÁFICO DE DONUT: Scope 1 vs Scope 3 (PONTO 6)
+    let scope1 = 0; // INTERNO
+    let scope3 = 0; // EXTERNO
+
+    dadosFiltrados.forEach(d => {
+      const metricaDef = mapaMetricas.get(d.id_metrica);
+      // Filtramos apenas as subcategorias de Emissões conforme o guião
+      if (metricaDef?.subcategoria?.toUpperCase() === 'EMISSOES' || d.id_unidade_base_esperada === 'TCO2E' || d.id_metrica?.toLowerCase().includes('co2')) {
+        if (d.origem?.toUpperCase() === 'INTERNO' || d.origem?.toUpperCase() === 'MANUAL') {
+          scope1 += (d.valor_convertido_base || d.valor || 0);
+        } else {
+          scope3 += (d.valor_convertido_base || d.valor || 0);
+        }
       }
     });
+    this.donutChartData.datasets[0].data = [parseFloat(scope1.toFixed(3)), parseFloat(scope3.toFixed(3))];
+    this.donutChartData = { ...this.donutChartData };
+
+    // 6. TABELA DE RASTREABILIDADE (PONTO 4)
+    // Cruzamos os resultados com os dados que lhes deram origem
+    this.tabelaRastreabilidade = resultadosFiltrados.map(r => {
+      // Procuramos o primeiro dado bruto correspondente para extrair a linhagem do ficheiro
+      const dadoOrigem = this.todosDados.find(d => d.id_metrica && r.id_kpi?.includes(d.id_metrica.substring(0,3))) || dadosFiltrados[0];
+      const docOrigem = dadoOrigem ? mapaDocumentos.get(dadoOrigem.id_documento) : null;
+      
+      return {
+        id_kpi: r.id_kpi,
+        valor_kpi: r.valor_calculado,
+        unidade: r.id_unidade || 'tCO2e/ton',
+        documento: docOrigem ? `${docOrigem.tipo_documento} (${docOrigem.numero_documento || 'N/A'})` : 'Consolidado IA',
+        entidade: mapaEntidades.get(r.id_entidade)?.nome || r.id_entidade || 'Metalogalva',
+        origem_fluxo: dadoOrigem?.origem || 'EXTRACAO_IA'
+      };
+    });
+
+    // 7. PAINEL DE DOCUMENTOS PROCESSADOS (PONTO 5)
+    this.painelDocumentos = this.todosDocumentos.map(doc => {
+      // Descobrir qual o período e entidade da fatura através dos dados nela contidos
+      const dadoDoDoc = this.todosDados.find(d => d.id_documento === doc.id_documento);
+      return {
+        numero: doc.numero_documento || doc.id_documento.substring(0, 12),
+        tipo: doc.tipo_documento || 'FATURA',
+        emissor: mapaEntidades.get(dadoDoDoc?.id_entidade)?.nome || 'Fornecedor Externo',
+        data: doc.data_emissao || doc.createdAt,
+        fonte: doc.fonte_ingestao || 'EXTRACAO_IA',
+        estado: doc.estado || 'PROCESSADO'
+      };
+    });
+
+    this.cdr.detectChanges();
   }
 }

@@ -1,78 +1,151 @@
-<div class="dashboard-wrapper-full">
+<div class="dashboard-fluid-container">
   
-  <header class="dashboard-header">
-    <div>
-      <h2>📊 Central de Sustentabilidade & Indicadores ESG</h2>
-      <p>Performance consolidada baseada em dados reais agregados na tabela de Resultados de KPIs.</p>
+  <header class="dashboard-toolbar">
+    <div class="brand">
+      <h2>📊 Dashboard de Monitorização & Pegada ESG</h2>
+      <p>Linhagem de dados e conformidade com as diretivas CSRD para a Metalogalva.</p>
     </div>
-    <div class="badge-directiva">Conformidade CSRD</div>
+    
+    <div class="filters-panel">
+      <div class="filter-group">
+        <label>Entidade</label>
+        <select [(ngModel)]="filtroEntidade" (change)="atualizarFiltros()">
+          <option value="">— Todas as Entidades —</option>
+          <option *ngFor="let ent of listaEntidades" [value]="ent.id_entidade">{{ ent.nome }}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Período Relatório</label>
+        <select [(ngModel)]="filtroPeriodo" (change)="atualizarFiltros()">
+          <option value="">— Todos os Períodos —</option>
+          <option *ngFor="let per of listaPeriodos" [value]="per.id_periodo">{{ per.id_periodo }}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Estado Auditoria</label>
+        <select [(ngModel)]="filtroEstado" (change)="atualizarFiltros()">
+          <option value="">— Todos os Estados —</option>
+          <option value="VALIDADO">Validado</option>
+          <option value="PENDENTE">Pendente</option>
+          <option value="ESTIMADO">Estimado</option>
+        </select>
+      </div>
+    </div>
   </header>
 
-  <div *ngIf="aCarregar" class="loading-wrapper">
+  <div *ngIf="aCarregar" class="loading-state">
     <div class="spinner"></div>
-    <p>A extrair matriz de cálculos e agregações da tabela resultadokpi...</p>
+    <p>A cruzar chaves primárias e a processar matriz de Scope 1 e Scope 3...</p>
   </div>
 
-  <div *ngIf="!aCarregar">
+  <div *ngIf="!aCarregar" class="dashboard-content-grid">
     
-    <div class="kpi-cards">
-      
-      <div class="card esg-card card-ambient">
-        <div class="card-icon">🌱</div>
-        <h3>Pegada Carbono Consolidada</h3>
-        <p class="valor">{{ emissoesTotaisCO2 }} <span class="unidade">tCO₂e</span></p>
-        <span class="etiqueta">Resultados agregados por Período de Auditoria</span>
-      </div>
-      
-      <div class="card esg-card card-energy">
-        <div class="card-icon">⚡</div>
-        <h3>Consumo Energético Global</h3>
-        <p class="valor">{{ consumoEnergiaTotal }} <span class="unidade">kWh</span></p>
-        <span class="etiqueta">Agregação analítica da cadeia de fornecimento</span>
+    <div class="kpi-cards-row">
+      <div class="kpi-card-industrial highlight-blue">
+        <div class="kpi-meta">KPI INDUSTRIAL</div>
+        <h3>Intensidade Carbónica do Aço</h3>
+        <p class="valor">{{ kpiIntensidadeAco?.valor_calculado }} <span class="uni">tCO₂e / ton</span></p>
+        <div class="card-footer-audit">
+          <span class="badge" [ngClass]="kpiIntensidadeAco?.estado_validacao?.toLowerCase()">{{ kpiIntensidadeAco?.estado_validacao }}</span>
+          <span class="date">Cálculo: {{ kpiIntensidadeAco?.data_calculo | date:'yyyy-MM-dd' }}</span>
+        </div>
       </div>
 
-      <div class="card esg-card card-governance">
-        <div class="card-icon">🛡️</div>
-        <h3>Índice de Confiança (Auditoria)</h3>
-        <p class="valor">{{ taxaValidacaoDados }}<span class="unidade">%</span></p>
-        <div class="progress-bar-container">
-          <div class="progress-bar" [style.width.%]="taxaValidacaoDados"></div>
+      <div class="kpi-card-industrial highlight-green">
+        <div class="kpi-meta">LOGÍSTICA / ESCOPO 3</div>
+        <h3>Pegada Carbónica Logística</h3>
+        <p class="valor">{{ kpiPegadaLogistica?.valor_calculado }} <span class="uni">tCO₂e / ton</span></p>
+        <div class="card-footer-audit">
+          <span class="badge" [ngClass]="kpiPegadaLogistica?.estado_validacao?.toLowerCase()">{{ kpiPegadaLogistica?.estado_validacao }}</span>
+          <span class="date">Cálculo: {{ kpiPegadaLogistica?.data_calculo | date:'yyyy-MM-dd' }}</span>
         </div>
-        <span class="etiqueta">Rácio de KPIs com validação final aprovada</span>
       </div>
     </div>
 
-    <div class="charts-grid">
-      
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>KPIs Processados por Pilar de Sustentabilidade</h3>
-          <span class="subtext">Divisão quantitativa de cálculos efetuados por estado</span>
+    <div class="charts-dual-row">
+      <div class="chart-box">
+        <div class="box-header">
+          <h3>📊 Valores Brutos Extraídos por Métrica Base</h3>
+          <p>Soma total convertida para a unidade base esperada no armazém de dados.</p>
         </div>
-        <div class="chart-wrapper">
-          <canvas baseChart
-            [data]="barChartData"
-            [options]="barChartOptions"
-            [plugins]="barChartPlugins"
-            [legend]="barChartLegend"
-            type="bar">
-          </canvas>
+        <div class="canvas-holder">
+          <canvas baseChart [data]="barChartData" [options]="barChartOptions" type="bar"></canvas>
         </div>
       </div>
 
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>Qualidade do Fecho Contabilístico ESG</h3>
-          <span class="subtext">Percentagem de resultados da tabela por estado de validação</span>
+      <div class="chart-box">
+        <div class="box-header">
+          <h3>🎯 Distribuição de Emissões: Scope 1 vs Scope 3</h3>
+          <p>Mapeamento automático baseado na origem do fluxo (Interno vs Cadeia de Valor).</p>
         </div>
-        <div class="chart-wrapper">
-          <canvas baseChart
-            [data]="pieChartData"
-            [options]="pieChartOptions"
-            type="pie">
-          </canvas>
+        <div class="canvas-holder">
+          <canvas baseChart [data]="donutChartData" [options]="donutChartOptions" type="doughnut"></canvas>
         </div>
       </div>
+    </div>
+
+    <div class="tables-dual-row">
+      
+      <div class="table-box">
+        <div class="box-header">
+          <h3>🛡️ Matriz de Rastreabilidade e Linhagem (Linhagem de Dados)</h3>
+        </div>
+        <div class="table-scroll">
+          <table class="esg-table">
+            <thead>
+              <tr>
+                <th>Indicador Target</th>
+                <th>Valor Calculado</th>
+                <th>Documento Origem</th>
+                <th>Entidade Contratante</th>
+                <th>Fluxo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of tabelaRastreabilidade">
+                <td><strong>{{ item.id_kpi }}</strong></td>
+                <td class="numeric">{{ item.valor_kpi }} {{ item.unidade }}</td>
+                <td><span class="doc-tag">{{ item.documento }}</span></td>
+                <td>{{ item.entidade }}</td>
+                <td><span class="badge-origem">{{ item.origem_fluxo }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <div class="box-header">
+          <h3>📄 Painel de Ingestão de Faturas e Documentos</h3>
+        </div>
+        <div class="table-scroll">
+          <table class="esg-table">
+            <thead>
+              <tr>
+                <th>Cód / Número</th>
+                <th>Tipo</th>
+                <th>Emissor</th>
+                <th>Data Emissão</th>
+                <th>Fonte Ingestão</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let doc of painelDocumentos">
+                <td><code>{{ doc.numero }}</code></td>
+                <td>{{ doc.tipo }}</td>
+                <td>{{ doc.emissor }}</td>
+                <td>{{ doc.data | date:'yyyy-MM-dd' }}</td>
+                <td><span class="source-tag">{{ doc.fonte }}</span></td>
+                <td><span class="status-pill validados">{{ doc.estado }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
 
   </div>

@@ -1,96 +1,94 @@
-
-.dashboard-wrapper-full {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 40px;
+.dashboard-fluid-container {
+    width: 100%;
+    padding: 24px;
     box-sizing: border-box;
+    background-color: #f1f5f9;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* ── HEADER CORPORATIVO ──────────────────────── */
-.dashboard-header {
+/* 1. TOOLBAR E FILTROS */
+.dashboard-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 32px;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 20px;
+    background: #ffffff;
+    padding: 20px 24px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+    gap: 16px;
 }
-.dashboard-header h2 { font-size: 26px; color: #1e293b; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.5px; }
-.dashboard-header p { color: #64748b; font-size: 14px; margin: 0; }
-.badge-directiva {
-    background-color: #e0f2fe; color: #0369a1; padding: 6px 16px;
-    border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+.brand h2 { font-size: 22px; color: #0f172a; margin: 0 0 4px; font-weight: 700; }
+.brand p { color: #64748b; font-size: 13px; margin: 0; }
+
+.filters-panel { display: flex; gap: 16px; flex-wrap: wrap; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: 11px; font-weight: bold; color: #475569; text-transform: uppercase; }
+.filter-group select {
+    padding: 8px 14px; border: 1px solid #cbd5e1; border-radius: 6px;
+    font-size: 13px; background: #fff; color: #334155; min-width: 180px;
 }
 
-/* ── LOADING SPINNER ─────────────────────────────────── */
-.loading-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 100px 0;
-    color: #475569;
+/* 2. CARDS INDUSTRIAIS */
+.kpi-cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 24px; margin-bottom: 24px;
 }
-.spinner {
-    width: 44px; height: 44px;
-    border: 4px solid #cbd5e1; border-top-color: #0284c7;
-    border-radius: 50%; animation: spin 0.8s linear infinite;
-    margin-bottom: 16px;
+.kpi-card-industrial {
+    background: #ffffff; border-radius: 12px; padding: 24px;
+    position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
+.kpi-meta { font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 1px; margin-bottom: 6px; }
+.kpi-card-industrial h3 { font-size: 16px; color: #1e293b; margin: 0 0 12px; font-weight: 600; }
+.kpi-card-industrial .valor { font-size: 38px; font-weight: 800; color: #0f172a; margin: 0 0 12px; font-family: monospace; }
+.kpi-card-industrial .uni { font-size: 16px; color: #64748b; font-weight: 500; }
+
+.card-footer-audit { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 12px; }
+.card-footer-audit .date { font-size: 11px; color: #94a3b8; }
+
+.highlight-blue { border-left: 6px solid #3498db; }
+.highlight-green { border-left: 6px solid #2ecc71; }
+
+/* BADGES DE ESTADO */
+.badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+.badge.validado { background: #d4edda; color: #155724; }
+.badge.pendente { background: #fff3cd; color: #856404; }
+.badge.simulado { background: #e2e8f0; color: #475569; }
+
+/* 3 & 6. GRELHA DE GRÁFICOS */
+.charts-dual-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;
+}
+@media (max-width: 1100px) { .charts-dual-row { grid-template-columns: 1fr; } }
+
+.chart-box { background: #ffffff; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+.box-header h3 { font-size: 15px; color: #1e293b; margin: 0 0 4px; font-weight: 600; }
+.box-header p { font-size: 12px; color: #94a3b8; margin: 0 0 16px; }
+.canvas-holder { position: relative; height: 320px; width: 100%; }
+
+/* 4 & 5. TABELAS DE RASTREABILIDADE */
+.tables-dual-row {
+    display: grid;
+    grid-template-columns: 1fr; gap: 24px;
+}
+.table-box { background: #ffffff; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+.table-scroll { overflow-x: auto; width: 100%; margin-top: 14px; }
+
+.esg-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.esg-table th { background: #f8fafc; padding: 12px 16px; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+.esg-table td { padding: 14px 16px; color: #334155; border-bottom: 1px solid #f1f5f9; }
+.esg-table tbody tr:hover { background: #f8fafc; }
+
+.numeric { font-family: monospace; font-weight: bold; font-size: 14px; }
+.doc-tag { background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 11px; color: #475569; }
+.source-tag { color: #8e44ad; font-weight: 600; font-size: 11px; }
+.badge-origem { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+
+/* LOADING SPINNER */
+.loading-state { display: flex; flex-direction: column; align-items: center; padding: 80px; color: #64748b; }
+.spinner { width: 40px; height: 40px; border: 4px solid #cbd5e1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── GRELHA DE CARDS EXPANSÍVEL ──────────────────────── */
-.kpi-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 24px;
-    margin-bottom: 32px;
-}
-.esg-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 26px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
-    position: relative;
-    overflow: hidden;
-}
-.card-icon { position: absolute; top: 22px; right: 24px; font-size: 26px; opacity: 0.8; }
-.esg-card h3 { font-size: 13px; color: #64748b; margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
-.esg-card .valor { font-size: 36px; font-weight: 700; color: #0f172a; margin: 0 0 8px; font-family: monospace; }
-.esg-card .unidade { font-size: 16px; color: #64748b; font-weight: 500; margin-left: 4px; }
-.esg-card .etiqueta { font-size: 12px; color: #94a3b8; display: block; }
-
-.card-ambient { border-top: 5px solid #2ecc71; }
-.card-energy { border-top: 5px solid #f1c40f; }
-.card-governance { border-top: 5px solid #3498db; }
-
-.progress-bar-container { background: #e2e8f0; border-radius: 10px; height: 6px; margin-bottom: 12px; overflow: hidden; width: 100%; }
-.progress-bar { background: #3498db; height: 100%; border-radius: 10px; transition: width 0.6s ease-in-out; }
-
-/* ── GRELHA DE GRÁFICOS ULTRA WIDE FLUIDA ─────────────── */
-.charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
-    gap: 28px;
-}
-@media (max-width: 1200px) {
-    .charts-grid { grid-template-columns: 1fr; }
-}
-
-.chart-card {
-    background: #ffffff;
-    padding: 26px;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.01);
-}
-.chart-header { margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 14px; }
-.chart-header h3 { font-size: 16px; color: #1e293b; margin: 0 0 4px; font-weight: 600; }
-.chart-header .subtext { font-size: 12px; color: #94a3b8; }
-
-.chart-wrapper {
-    position: relative;
-    height: 360px; /* Gráficos maiores e com mais detalhe visual */
-    width: 100%;
-}

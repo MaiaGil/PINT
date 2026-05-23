@@ -196,6 +196,17 @@ export class ExtracaoIaComponent implements OnDestroy {
     descarregarInbound(): void {
         if (!this.inboundJson) return;
 
+        // 🚀 1. Extrair os dados de identificação do objeto JSON
+        const entidade = this.inboundJson.meta?.entidade?.id_entidade || 'ENTIDADE';
+        const tipoDoc = this.inboundJson.meta?.documento?.tipo_documento || 'DOC';
+        const numDoc = this.inboundJson.meta?.documento?.numero_documento || 'SEM_NUMERO';
+
+        // 🧼 2. Limpar caracteres que o sistema operativo não aceita em nomes de ficheiros
+        const nomeFicheiroLimpo = `${entidade}_${tipoDoc}_${numDoc}`
+            .replace(/[\\/:*?"<>| ]/g, '_') // Substitui espaços e símbolos por underscores
+            .toUpperCase();
+
+        // 📄 3. Criar o processo normal de download com o novo nome dinâmico
         const blob = new Blob(
             [JSON.stringify(this.inboundJson, null, 2)],
             { type: 'application/json' }
@@ -203,7 +214,10 @@ export class ExtracaoIaComponent implements OnDestroy {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'inbound.json';
+        
+        // Define o nome dinâmico aqui (ex: ENT_CIMENTOS_FATURA_2026_99.json)
+        a.download = `INBOUND_${nomeFicheiroLimpo}.json`; 
+        
         a.click();
         window.URL.revokeObjectURL(url);
     }
