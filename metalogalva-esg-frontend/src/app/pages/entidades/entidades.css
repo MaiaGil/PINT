@@ -1,0 +1,117 @@
+/* Reutiliza a estrutura base da tua dashboard */
+.dashboard-fluid-container {
+  padding: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.dashboard-toolbar {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 16px;
+}
+
+.brand h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+}
+
+.brand p {
+  margin: 4px 0 0 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.table-box {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  padding: 20px;
+}
+
+.box-header {
+  margin-bottom: 16px;
+}
+
+.box-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: #34495e;
+}
+
+.box-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.esg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.esg-table th, .esg-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.esg-table th {
+  background-color: #f8f9fa;
+  color: #2c3e50;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+code {
+  background: #f1f2f6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #e67e22;
+}
+
+/* Badges Dinâmicas para os Tipos de Entidade */
+.badge-tipo {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  background: #ecf0f1;
+  color: #7f8c8d;
+}
+
+/* Pinta de azul se for a empresa principal, e verde para fornecedores */
+.badge-tipo.empresa { background: #d0e1fd; color: #2980b9; }
+.badge-tipo.fornecedor { background: #d5f5e3; color: #27ae60; }
+.badge-tipo.cliente { background: #fdebd0; color: #d35400; }
+
+.country-tag {
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.loading-state, .error-box {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.error-box {
+  color: #e74c3c;
+  font-weight: bold;
+}

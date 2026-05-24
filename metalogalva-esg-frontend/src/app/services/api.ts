@@ -109,9 +109,22 @@ export class ApiService {
 		return this.http.get(`${this.apiUrl}/documentos`);
 	}
 
+	// --- Adiciona no teu ApiService ---
+	atualizarDocumento(idDocumento: string, dados: any) {
+		return this.http.put(`${this.apiUrl}/documentos/${idDocumento}`, dados);
+	}
+
+	eliminarDocumento(idDocumento: string) {
+		return this.http.delete(`${this.apiUrl}/documentos/${idDocumento}`);
+	}
+
 	obterEntidades(): Observable<any> {
 		return this.http.get(`${this.apiUrl}/entidades`);
 	}
+
+	eliminarEntidade(idEntidade: string): Observable<any> {
+    	return this.http.delete(`${this.apiUrl}/entidades/${idEntidade}`);
+  	}
 
 	obterPeriodos(): Observable<any> {
 		return this.http.get(`${this.apiUrl}/periodos`);
@@ -122,10 +135,6 @@ export class ApiService {
 			`${this.apiUrl}/ia/download-inbound/${idDocumento}`,
 			{ responseType: 'blob' }
 		);
-	}
-
-	eliminarDocumento(idDocumento: string): Observable<any> {
-		return this.http.delete(`${this.apiUrl}/documentos/${idDocumento}`);
 	}
 
 	// ── KPIs ──────────────────────────────────────────────

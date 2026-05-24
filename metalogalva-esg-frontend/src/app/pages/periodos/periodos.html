@@ -1,0 +1,66 @@
+<div class="dashboard-fluid-container">
+  
+  <header class="dashboard-toolbar">
+    <div class="brand">
+      <h2>📅 Ciclos de Reporte ESG</h2>
+      <p>Gestão dos anos fiscais e períodos de auditoria (CSRD) da Metalogalva.</p>
+    </div>
+  </header>
+
+  <div *ngIf="aCarregar" class="loading-state">
+    <div class="spinner"></div>
+    <p>A sincronizar calendário de reportes...</p>
+  </div>
+
+  <div *ngIf="erroMsg" class="error-box">
+    <p>⚠️ {{ erroMsg }}</p>
+  </div>
+
+  <div *ngIf="!aCarregar && !erroMsg" class="dashboard-content-grid">
+    
+    <div class="periodos-grid">
+      
+      <div 
+        class="periodo-card" 
+        *ngFor="let per of listaPeriodos" 
+        [ngClass]="{'card-atual': per.isAtual}">
+        
+        <div class="badge-star" *ngIf="per.isAtual">
+          ⭐ Exercício Atual
+        </div>
+
+        <div class="card-icon">📁</div>
+        
+        <h3>Período {{ per.id_periodo }}</h3>
+        
+        <div class="periodo-stats">
+          <div class="stat-row">
+            <span>Estado:</span>
+            <span class="status-pill" [ngClass]="per.estado?.toLowerCase() || 'aberto'">
+              {{ per.estado || 'ABERTO' }}
+            </span>
+          </div>
+          <div class="stat-row">
+            <span>Documentos:</span>
+            <strong>~ {{ per.documentosProcessados }} processados</strong>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button class="btn-lock" [title]="per.estado === 'FECHADO' ? 'Reabrir Período' : 'Fechar Reporte'">
+            {{ per.estado === 'FECHADO' ? '🔓 Reabrir' : '🔒 Fechar Ciclo' }}
+          </button>
+        </div>
+
+      </div>
+
+      <div class="periodo-card card-add">
+        <div class="card-icon-add">+</div>
+        <h3>Abrir Novo Período</h3>
+        <p>Iniciar a extração para um novo ano fiscal.</p>
+      </div>
+
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,141 @@
+/* Reutilização Base */
+.dashboard-fluid-container { padding: 24px; max-width: 1600px; margin: 0 auto; }
+.dashboard-toolbar { margin-bottom: 24px; border-bottom: 1px solid #eee; padding-bottom: 16px; }
+.brand h2 { margin: 0; color: #2c3e50; font-size: 1.5rem; }
+.brand p { margin: 4px 0 0 0; color: #7f8c8d; font-size: 0.9rem; }
+
+/* 🚀 GRELHA DE CARTÕES DE PERÍODOS */
+.periodos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  grid-column: 1 / -1;
+}
+
+.periodo-card {
+  background: white;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  position: relative;
+  border: 1px solid #f1f2f6;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.periodo-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+}
+
+/* 🔥 ESTILO PARA O CARTÃO ATUAL (A TUA ESTRELA!) */
+.card-atual {
+  border: 2px solid #3498db;
+  background: #f8faff;
+}
+
+.badge-star {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  background: #f1c40f;
+  color: #8a6d3b;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(241, 196, 15, 0.4);
+  letter-spacing: 0.5px;
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+.periodo-card h3 {
+  margin: 0 0 16px 0;
+  color: #2c3e50;
+  font-size: 1.3rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 12px;
+}
+
+.periodo-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-grow: 1;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+.stat-row strong {
+  color: #34495e;
+}
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.status-pill.aberto { background: #e0f7fa; color: #00acc1; }
+.status-pill.fechado { background: #f1f2f6; color: #7f8c8d; }
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-lock {
+  background: white;
+  border: 1px solid #bdc3c7;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #34495e;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.btn-lock:hover {
+  background: #f1f2f6;
+  border-color: #95a5a6;
+}
+
+/* CARTÃO PARA ADICIONAR NOVO (Visual Dotted) */
+.card-add {
+  border: 2px dashed #bdc3c7;
+  background: transparent;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.card-add:hover {
+  background: rgba(52, 152, 219, 0.05);
+  border-color: #3498db;
+}
+
+.card-icon-add {
+  font-size: 3rem;
+  color: #bdc3c7;
+  margin-bottom: 12px;
+}
+
+.card-add h3 { border: none; color: #7f8c8d; margin-bottom: 4px; }
+.card-add p { color: #95a5a6; font-size: 0.85rem; margin: 0; }

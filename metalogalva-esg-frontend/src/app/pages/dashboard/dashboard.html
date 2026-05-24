@@ -9,7 +9,7 @@
     <div class="filters-panel">
       <div class="filter-group">
         <label>Entidade</label>
-        <select [(ngModel)]="filtroEntidade" (change)="atualizarFiltros()">
+        <select [(ngModel)]="filtroEntidade" (change)="limparDestaqueEAtualizar()">
           <option value="">— Visão Global Corporativa —</option>
           <option *ngFor="let ent of listaEntidades" [value]="ent.id_entidade">{{ ent.nome }}</option>
         </select>
@@ -17,7 +17,7 @@
 
       <div class="filter-group">
         <label>Período Relatório</label>
-        <select [(ngModel)]="filtroPeriodo" (change)="atualizarFiltros()">
+        <select [(ngModel)]="filtroPeriodo" (change)="limparDestaqueEAtualizar()">
           <option value="">— Todos os Períodos —</option>
           <option *ngFor="let per of listaPeriodos" [value]="per.id_periodo">{{ per.id_periodo }}</option>
         </select>
@@ -32,12 +32,27 @@
           <option value="ESTIMADO">Estimado</option>
         </select>
       </div>
+
+      <div class="filter-group">
+        <label>⭐ Cartão Principal</label>
+        <select [(ngModel)]="filtroDestaque" (change)="atualizarFiltros()">
+          <option value="">— Automático —</option>
+          
+          <optgroup label="Selecionar KPI" *ngIf="!filtroEntidade">
+            <option *ngFor="let kpi of listaKpisUnicos" [value]="kpi.id">{{ kpi.nome }}</option>
+          </optgroup>
+          
+          <optgroup label="Selecionar Métrica" *ngIf="filtroEntidade">
+            <option *ngFor="let m of listaMetricasUnicas" [value]="m.id">{{ m.nome }}</option>
+          </optgroup>
+        </select>
+      </div>
     </div>
   </header>
 
   <div *ngIf="aCarregar" class="loading-state">
     <div class="spinner"></div>
-    <p>A compilar estrutura dinâmica da Dashboard...</p>
+    <p>A compilar estrutura e a avaliar o desvio de metas da indústria...</p>
   </div>
 
   <div *ngIf="!aCarregar" class="dashboard-content-grid">
@@ -47,7 +62,15 @@
         <div class="kpi-meta">{{ kpi.meta }}</div>
         <h3>{{ kpi.titulo }}</h3>
         <p class="valor">{{ kpi.valor }} <span class="uni">{{ kpi.unidade }}</span></p>
-        <div class="card-footer-audit">
+        
+        <div class="kpi-context-box" *ngIf="kpi.contexto">
+          <div class="target-label">{{ kpi.contexto.labelMeta }}</div>
+          <div class="target-status" [ngClass]="kpi.contexto.classeCor">
+             <strong>{{ kpi.contexto.mensagem }}</strong>
+          </div>
+        </div>
+
+        <div class="card-footer-audit" [ngStyle]="{'margin-top': kpi.contexto ? '12px' : 'auto'}">
           <span class="badge" [ngClass]="kpi.estado.replace(' ', '-').toLowerCase()">{{ kpi.estado }}</span>
           <span class="date">Atualizado: {{ kpi.data | date:'HH:mm' }}</span>
         </div>
@@ -59,7 +82,6 @@
       <div class="chart-box">
         <div class="box-header">
           <h3>📊 Métricas Base (Escala < 5000)</h3>
-          <p>Consumos de menor escala em unidade base.</p>
         </div>
         <div class="canvas-holder">
           <canvas baseChart [data]="barChartDataAbaixo5000" [options]="barChartOptions" type="bar"></canvas>
@@ -69,7 +91,6 @@
       <div class="chart-box">
         <div class="box-header">
           <h3>📈 Grandes Volumes (Escala >= 5000)</h3>
-          <p>Consumos e volumes de massa crítica.</p>
         </div>
         <div class="canvas-holder">
           <canvas baseChart [data]="barChartDataAcima5000" [options]="barChartOptions" type="bar"></canvas>
@@ -79,7 +100,6 @@
       <div class="chart-box">
         <div class="box-header">
           <h3>🎯 Escopo: Scope 1 vs Scope 3</h3>
-          <p>Metalogalva (Interno) vs Fornecedores (Externo).</p>
         </div>
         <div class="canvas-holder">
           <canvas baseChart [data]="donutChartData" [options]="donutChartOptions" type="doughnut"></canvas>

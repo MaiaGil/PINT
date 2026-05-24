@@ -1,0 +1,107 @@
+<div class="dashboard-fluid-container">
+  
+  <header class="dashboard-toolbar">
+    <div class="brand">
+      <h2>📄 Gestão de Faturas e Relatórios</h2>
+      <p>Auditoria, edição e controlo de documentos ingeridos pela IA da Metalogalva.</p>
+    </div>
+  </header>
+
+  <div *ngIf="aCarregar" class="loading-state">
+    <div class="spinner"></div>
+    <p>A sincronizar o cofre de documentos...</p>
+  </div>
+
+  <div *ngIf="erroMsg" class="error-box">
+    <p>⚠️ {{ erroMsg }}</p>
+  </div>
+
+  <div *ngIf="!aCarregar && !erroMsg" class="dashboard-content-grid">
+    
+    <div class="edit-panel-card" *ngIf="docEmEdicao">
+      <div class="edit-header">
+        <h3>✏️ A Editar Documento: <code>{{ docEmEdicao.id_documento }}</code></h3>
+        <p>Emissor original: <strong>{{ docEmEdicao.nome_emissor }}</strong> (Não modificável)</p>
+      </div>
+
+      <div class="edit-form-grid">
+        <div class="form-group">
+          <label>Nº Fatura / Referência</label>
+          <input type="text" [(ngModel)]="docEmEdicao.numero_documento" placeholder="Ex: FT 2026/01">
+        </div>
+
+        <div class="form-group">
+          <label>Tipo de Documento</label>
+          <select [(ngModel)]="docEmEdicao.tipo_documento">
+            <option value="FATURA">Fatura</option>
+            <option value="RELATORIO">Relatório Sustentabilidade</option>
+            <option value="GUIA_TRANSPORTE">Guia de Transporte</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Estado da Validação</label>
+          <select [(ngModel)]="docEmEdicao.estado">
+            <option value="PROCESSADO">Processado (Automático)</option>
+            <option value="VALIDADO">Validado (Auditor)</option>
+            <option value="REJEITADO">Rejeitado / Anomalia</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="edit-actions">
+        <button class="btn-cancel" (click)="cancelarEdicao()">❌ Cancelar</button>
+        <button class="btn-save" (click)="guardarEdicao()">💾 Guardar Alterações</button>
+      </div>
+    </div>
+
+    <div class="table-box" style="grid-column: 1 / -1;" [ngClass]="{'dimmed': docEmEdicao}">
+      <div class="box-header">
+        <h3>Repositório de Ingestão</h3>
+        <p>Total de documentos processados: <strong>{{ listaDocumentos.length }}</strong></p>
+      </div>
+      
+      <div class="table-scroll">
+        <table class="esg-table">
+          <thead>
+            <tr>
+              <th>ID Sistema</th>
+              <th>Referência</th>
+              <th>Emissor / Entidade</th>
+              <th>Tipo</th>
+              <th>Data Emissão</th>
+              <th>Estado</th>
+              <th style="text-align: right;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let doc of listaDocumentos" [ngClass]="{'active-row': docEmEdicao?.id_documento === doc.id_documento}">
+              <td><span class="system-id">{{ doc.id_documento.substring(0, 8) }}...</span></td>
+              <td><strong>{{ doc.numero_documento || 'S/N' }}</strong></td>
+              <td>{{ doc.nome_emissor }}</td>
+              <td><span class="doc-tag">{{ doc.tipo_documento }}</span></td>
+              <td>{{ doc.data_emissao | date:'dd/MM/yyyy' }}</td>
+              <td>
+                <span class="badge-estado" [ngClass]="doc.estado?.toLowerCase() || 'processado'">
+                  {{ doc.estado || 'PROCESSADO' }}
+                </span>
+              </td>
+              
+              <td style="text-align: right; white-space: nowrap;">
+                <button class="btn-action edit" (click)="iniciarEdicao(doc)" title="Editar">✏️</button>
+                <button class="btn-action delete" (click)="apagarDocumento(doc.id_documento, doc.numero_documento)" title="Apagar">🗑️</button>
+              </td>
+            </tr>
+            
+            <tr *ngIf="listaDocumentos.length === 0">
+              <td colspan="7" style="text-align: center; padding: 24px;">
+                Nenhum documento registado. A IA ainda não processou faturas.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,79 @@
+<div class="dashboard-fluid-container">
+  
+  <header class="dashboard-toolbar">
+    <div class="brand">
+      <h2>🏢 Gestão de Entidades</h2>
+      <p>Catálogo central de fornecedores, clientes e parceiros logísticos da Metalogalva.</p>
+    </div>
+  </header>
+
+  <div *ngIf="aCarregar" class="loading-state">
+    <div class="spinner"></div>
+    <p>A mapear chaves primárias e a verificar relacionamentos de dados...</p>
+  </div>
+
+  <div *ngIf="erroMsg" class="error-box">
+    <p>⚠️ {{ erroMsg }}</p>
+  </div>
+
+  <div *ngIf="!aCarregar && !erroMsg" class="dashboard-content-grid">
+    
+    <div class="table-box" style="grid-column: 1 / -1;">
+      <div class="box-header">
+        <h3>📋 Diretório de Fornecedores e Cadeia de Valor (Scope 3)</h3>
+        <p>Total de entidades registadas: <strong>{{ listaEntidades.length }}</strong></p>
+      </div>
+      
+      <div class="table-scroll">
+        <table class="esg-table">
+          <thead>
+            <tr>
+              <th>ID Entidade</th>
+              <th>Nome da Empresa</th>
+              <th>Tipo</th>
+              <th>País</th>
+              <th style="text-align: center;">Registos</th> <th style="text-align: right;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let ent of listaEntidades">
+              <td><code>{{ ent.id_entidade }}</code></td>
+              <td><strong>{{ ent.nome }}</strong></td>
+              <td>
+                <span class="badge-tipo" [ngClass]="ent.tipo_entidade?.toLowerCase() || 'outro'">
+                  {{ ent.tipo_entidade || 'OUTRO' }}
+                </span>
+              </td>
+              <td>
+                <span class="country-tag">{{ ent.pais || 'N/D' }}</span>
+              </td>
+              
+              <td style="text-align: center;">
+                <span class="country-tag" [ngStyle]="{'background': ent.qtdDados > 0 ? '#e3f2fd' : '#f8f9fa', 'color': ent.qtdDados > 0 ? '#2980b9' : '#7f8c8d'}">
+                  {{ ent.qtdDados }}
+                </span>
+              </td>
+              
+              <td style="text-align: right;">
+                <button 
+                  class="btn-apagar" 
+                  [disabled]="ent.bloqueado"
+                  [title]="ent.motivoBloqueio"
+                  (click)="apagarEntidade(ent.id_entidade, ent.nome)">
+                  🗑️ Apagar
+                </button>
+              </td>
+            </tr>
+            
+            <tr *ngIf="listaEntidades.length === 0">
+              <td colspan="6" style="text-align: center; padding: 24px;">
+                Nenhuma entidade registada no sistema. Faz a extração de uma fatura para criar a primeira!
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>

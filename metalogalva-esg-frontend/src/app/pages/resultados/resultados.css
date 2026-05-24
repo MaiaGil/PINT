@@ -1,0 +1,66 @@
+/* Reutilização Base */
+.dashboard-fluid-container { padding: 24px; max-width: 1600px; margin: 0 auto; }
+.dashboard-toolbar { margin-bottom: 24px; border-bottom: 1px solid #eee; padding-bottom: 16px; }
+.brand h2 { margin: 0; color: #2c3e50; font-size: 1.5rem; }
+.brand p { margin: 4px 0 0 0; color: #7f8c8d; font-size: 0.9rem; }
+
+.table-box { background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; }
+.box-header { margin-bottom: 16px; }
+.box-header h3 { margin: 0 0 4px 0; font-size: 1.1rem; color: #34495e; }
+
+.table-scroll { overflow-x: auto; }
+.esg-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.esg-table th, .esg-table td { padding: 16px; text-align: left; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.esg-table th { background-color: #f8f9fa; color: #2c3e50; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
+
+.col-data { color: #7f8c8d; font-size: 0.85rem; white-space: nowrap; }
+.entity-tag { background: #f1f2f6; border: 1px solid #dfe4ea; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; color: #2f3542; }
+
+/* 🚀 ESTILOS PARA A "CONTA FEITA" */
+.col-formula { width: 35%; }
+.math-box {
+  background: #2f3542;
+  border-radius: 6px;
+  padding: 8px 12px;
+  border-left: 4px solid #3498db;
+  display: inline-block;
+  width: 100%;
+}
+
+.math-box code {
+  color: #a4b0be;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+}
+
+/* 🎯 ESTILOS PARA O VALOR CALCULADO */
+.resultado-box {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  background: #f8faff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #d0e1fd;
+}
+
+.res-valor {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #2980b9;
+}
+
+.res-unidade {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #7f8c8d;
+}
+
+.badge-audit {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #27ae60;
+  text-transform: uppercase;
+}

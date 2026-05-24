@@ -1,0 +1,76 @@
+<div class="dashboard-fluid-container">
+  
+  <header class="dashboard-toolbar">
+    <div class="brand">
+      <h2>🧮 Auditoria de Resultados KPI</h2>
+      <p>Registo imutável dos cálculos de emissões da Metalogalva e das contas realizadas pelo motor ESG.</p>
+    </div>
+  </header>
+
+  <div *ngIf="aCarregar" class="loading-state">
+    <div class="spinner"></div>
+    <p>A extrair o rasto de auditoria e fórmulas matemáticas...</p>
+  </div>
+
+  <div *ngIf="erroMsg" class="error-box">
+    <p>⚠️ {{ erroMsg }}</p>
+  </div>
+
+  <div *ngIf="!aCarregar && !erroMsg" class="dashboard-content-grid">
+    
+    <div class="table-box" style="grid-column: 1 / -1;">
+      <div class="box-header">
+        <h3>Livro Razão de Cálculos (Ledger)</h3>
+        <p>Histórico completo com a demonstração da conta feita.</p>
+      </div>
+      
+      <div class="table-scroll">
+        <table class="esg-table resultados-table">
+          <thead>
+            <tr>
+              <th>Data Cálculo</th>
+              <th>Entidade Alvo</th>
+              <th>Indicador de Performance (KPI)</th>
+              <th>Fórmula / Conta Feita</th>
+              <th style="text-align: right;">Valor Final Apurado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let res of listaResultados">
+              <td class="col-data">{{ res.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td><span class="entity-tag">{{ res.nome_entidade }}</span></td>
+              
+              <td><strong>{{ res.nome_kpi }}</strong></td>
+              
+              <td class="col-formula">
+                <div class="math-box">
+                  <code>{{ res.conta_feita }}</code>
+                </div>
+              </td>
+              
+              <td style="text-align: right;">
+                <div class="resultado-box">
+                  <span class="res-valor">{{ res.valor_calculado | number:'1.2-3' }}</span>
+                  <span class="res-unidade">{{ res.id_unidade || 'tCO2e' }}</span>
+                </div>
+                <div style="margin-top: 6px;">
+                  <span class="badge-audit" [ngClass]="res.estado_validacao?.toLowerCase() || 'validado'">
+                    ✓ {{ res.estado_validacao || 'VALIDADO' }}
+                  </span>
+                </div>
+              </td>
+
+            </tr>
+            
+            <tr *ngIf="listaResultados.length === 0">
+              <td colspan="5" style="text-align: center; padding: 24px;">
+                Nenhum resultado processado até ao momento.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
