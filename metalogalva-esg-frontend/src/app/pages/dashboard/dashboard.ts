@@ -106,7 +106,7 @@ export class DashboardComponent implements OnInit {
     const chaveTratada = idKpi.toLowerCase().trim();
 
     const metasExatas: { [key: string]: { valor: number, label: string } } = {
-      'kpi_intensidade_de_emissoes_de_carbono_do_transporte': { valor: 0.150, label: 'Meta Indústria: 0.15 tCO₂e/ton' },
+      'kpi_intensidade_de_emissoes_de_carbono_do_transporte': { valor: 1.85, label: 'Meta Indústria: 1.85 tCO₂e/ton' },
       'kpi_pegada_de_carbono_logistica_por_combustivel': { valor: 100.000, label: 'Teto de Emissões: 100 tCO₂e' },
       'kpi_intensidade_carbonica_do_aco': { valor: 1.400, label: 'Meta Indústria: 1.4 tCO₂e/ton' },
       'kpi_emissoes_totais_scope_1': { valor: 500, label: 'Orçamento Scope 1: 500 tCO₂e' },
