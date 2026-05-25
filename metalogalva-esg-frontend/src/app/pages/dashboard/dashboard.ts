@@ -85,13 +85,40 @@ export class DashboardComponent implements OnInit {
         this.todosDocumentos = res.documentos?.dados || [];
         this.todasMetricas = res.metricas?.dados || [];
         this.listaEntidades = res.entidades?.dados || [];
-        this.listaPeriodos = res.periodos?.dados || [];
+        
+        // 🚀 O MESMO MOTOR DE TRADUÇÃO DE PERÍODOS AQUI
+        const periodosBrutos = res.periodos?.dados || [];
+        this.listaPeriodos = periodosBrutos.map((p: any) => {
+          let labelLegivel = p.id_periodo || 'Período Indefinido';
+          
+          if (p.id_periodo) {
+            const idUpper = p.id_periodo.toUpperCase().trim();
+            const matchSimples = idUpper.match(/^(\d{4})-[QT]([1-4])$/);
+            const matchPrefixado = idUpper.match(/^PER_(\d{4})_[QT]([1-4])$/);
+            const matchAnoSimples = idUpper.match(/^(\d{4})$/);
+
+            if (matchSimples) {
+              labelLegivel = `Trimestre ${matchSimples[2]}, Ano ${matchSimples[1]}`;
+            } else if (matchPrefixado) {
+              labelLegivel = `Trimestre ${matchPrefixado[2]}, Ano ${matchPrefixado[1]}`;
+            } else if (matchAnoSimples) {
+              labelLegivel = `Ano ${matchAnoSimples[1]}`;
+            } else if (idUpper.includes('ANUAL')) {
+              const ano = idUpper.replace(/[^0-9]/g, '');
+              labelLegivel = `Ano ${ano}`;
+            } else if (idUpper.includes('M')) {
+              const matchMensal = idUpper.match(/(?:PER_)?(\d{4})_M(\d{2})/);
+              if (matchMensal) labelLegivel = `Mês ${matchMensal[2]}, Ano ${matchMensal[1]}`;
+            }
+          }
+          return { ...p, labelLegivel };
+        });
+
         this.processarDashboard();
       }
     });
   }
 
-  // Limpa o cartão em destaque sempre que mudas de fornecedor para evitar erros
   limparDestaqueEAtualizar(): void {
     this.filtroDestaque = '';
     this.processarDashboard();

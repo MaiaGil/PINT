@@ -14,8 +14,27 @@
 .esg-table th { background-color: #f8f9fa; color: #2c3e50; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
 
 .col-data { color: #7f8c8d; font-size: 0.85rem; white-space: nowrap; }
-.entity-tag { background: #f1f2f6; border: 1px solid #dfe4ea; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; color: #2f3542; }
+/* Atualiza a entity-tag para ter um comportamento melhor dentro de tabelas */
+.entity-tag {
+  display: inline-block; /* Mantém como bloco, mas ajustamos o padding/margin */
+  background: #f1f2f6; 
+  border: 1px solid #dfe4ea; 
+  padding: 4px 10px; 
+  border-radius: 6px; /* Bordas um pouco mais suaves */
+  font-weight: 600; 
+  font-size: 0.8rem; 
+  color: #2f3542;
+  white-space: nowrap; /* Impede que o nome da entidade quebre no meio */
+  max-width: 200px;    /* Limita o tamanho máximo */
+  overflow: hidden;    /* Esconde se for demasiado longo */
+  text-overflow: ellipsis; /* Coloca '...' se for grande demais */
+  vertical-align: middle;
+}
 
+/* Garante que a célula que contém a entidade não empurra as outras colunas */
+.esg-table td:nth-child(2) {
+  max-width: 220px;
+}
 /* 🚀 ESTILOS PARA A "CONTA FEITA" */
 .col-formula { width: 35%; }
 .math-box {

@@ -3,13 +3,13 @@
   <header class="dashboard-toolbar">
     <div class="brand">
       <h2>🧮 Auditoria de Resultados KPI</h2>
-      <p>Registo imutável dos cálculos de emissões da Metalogalva e das contas realizadas pelo motor ESG.</p>
+      <p>Registo imutável dos cálculos de emissões da Metalogalva e verificação de integridade referencial.</p>
     </div>
   </header>
 
   <div *ngIf="aCarregar" class="loading-state">
     <div class="spinner"></div>
-    <p>A extrair o rasto de auditoria e fórmulas matemáticas...</p>
+    <p>A extrair o rasto de auditoria e testar a integridade das fórmulas matemáticas...</p>
   </div>
 
   <div *ngIf="erroMsg" class="error-box">
@@ -31,33 +31,48 @@
               <th>Data Cálculo</th>
               <th>Entidade Alvo</th>
               <th>Indicador de Performance (KPI)</th>
-              <th>Fórmula / Conta Feita</th>
+              <th>Fórmula (Modelagem KPI)</th>
               <th style="text-align: right;">Valor Final Apurado</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let res of listaResultados">
+            <tr *ngFor="let res of listaResultados" [ngClass]="{'row-error': res.tem_erro}">
               <td class="col-data">{{ res.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
               <td><span class="entity-tag">{{ res.nome_entidade }}</span></td>
               
-              <td><strong>{{ res.nome_kpi }}</strong></td>
+              <td>
+                <strong [ngStyle]="{'color': res.tem_erro ? '#e74c3c' : 'inherit'}">
+                  {{ res.nome_kpi }}
+                </strong>
+              </td>
               
               <td class="col-formula">
-                <div class="math-box">
-                  <code>{{ res.conta_feita }}</code>
+                <div class="math-box" [ngStyle]="{'border-left-color': res.tem_erro ? '#e74c3c' : '#3498db'}">
+                  <code [ngStyle]="{'color': res.tem_erro ? '#e74c3c' : '#a4b0be'}">
+                    {{ res.conta_feita }}
+                  </code>
                 </div>
               </td>
               
               <td style="text-align: right;">
-                <div class="resultado-box">
-                  <span class="res-valor">{{ res.valor_calculado | number:'1.2-3' }}</span>
-                  <span class="res-unidade">{{ res.id_unidade || 'tCO2e' }}</span>
-                </div>
-                <div style="margin-top: 6px;">
-                  <span class="badge-audit" [ngClass]="res.estado_validacao?.toLowerCase() || 'validado'">
-                    ✓ {{ res.estado_validacao || 'VALIDADO' }}
-                  </span>
-                </div>
+                
+                <ng-container *ngIf="!res.tem_erro">
+                  <div class="resultado-box">
+                    <span class="res-valor">{{ res.valor_calculado | number:'1.2-3' }}</span>
+                    <span class="res-unidade">{{ res.id_unidade || 'tCO2e' }}</span>
+                  </div>
+                  <div style="margin-top: 6px;">
+                    <span class="badge-audit validado">✓ {{ res.estado_validacao || 'INTEGRO' }}</span>
+                  </div>
+                </ng-container>
+
+                <ng-container *ngIf="res.tem_erro">
+                  <div class="error-badge-box">
+                    <span class="error-icon">⚠️</span>
+                    <span class="error-texto">{{ res.mensagem_erro }}</span>
+                  </div>
+                </ng-container>
+
               </td>
 
             </tr>

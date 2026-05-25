@@ -15,7 +15,7 @@
     
     <div class="alert erro" *ngIf="mensagemErro">❌ {{ mensagemErro }}</div>
 
-<h3 class="seccao-titulo">🔗 Relacionamentos</h3>
+    <h3 class="seccao-titulo">🔗 Relacionamentos</h3>
     <div class="form-grid mb-4">
       <div class="campo">
         <label>ID Documento (Fatura)</label>
@@ -47,7 +47,7 @@
         <select [(ngModel)]="form.id_periodo">
           <option value="">— Selecionar Período —</option>
           <option *ngFor="let p of periodos" [value]="p.id_periodo">
-            {{ p.id_periodo }}
+            {{ p.labelLegivel }}
           </option>
         </select>
       </div>
@@ -90,6 +90,7 @@
         </select>
       </div>
     </div>
+
     <h3 class="seccao-titulo">🛡️ Validação & Auditoria</h3>
     <div class="form-grid">
       <div class="campo">
@@ -134,7 +135,7 @@
       class="filtro-texto"
       [(ngModel)]="filtroTexto"
       (ngModelChange)="aplicarFiltros()"
-      placeholder="🔍 Pesquisar ID, Métrica, Entidade..." />
+      placeholder="🔍 Pesquisar Métrica, Entidade..." />
 
     <select [(ngModel)]="filtroEstado" (ngModelChange)="aplicarFiltros()">
       <option value="">Todos os Estados</option>
@@ -177,9 +178,9 @@
         <tr *ngFor="let d of dadosFiltrados">
           <td><span class="badge-origem">{{ d.origem }}</span></td>
           
-          <td><strong>{{ d.id_metrica }}</strong></td>
-          <td>{{ d.id_entidade }}</td>
-          <td>{{ d.id_periodo }}</td>
+          <td><strong>{{ d.nome_metrica }}</strong></td>
+          <td>{{ d.nome_entidade }}</td>
+          <td>{{ d.nome_periodo }}</td>
           
           <td><code>{{ d.valor }}</code> <small>{{ d.id_unidade_original ?? '' }}</small></td>
           <td>
@@ -205,7 +206,7 @@
   <div class="modal-overlay" *ngIf="dadoAEliminar">
     <div class="modal">
       <h3>⚠️ Eliminar Registo</h3>
-      <p>Tens a certeza que queres eliminar o dado referente a <strong>{{ dadoAEliminar.id_metrica }}</strong>?</p>
+      <p>Tens a certeza que queres eliminar o dado referente a <strong>{{ dadoAEliminar.nome_metrica }}</strong>?</p>
       <div class="modal-acoes">
         <button class="btn-eliminar-confirm" (click)="eliminar()">Sim, apagar da BD</button>
         <button class="btn-cancelar" (click)="cancelarEliminacao()">Cancelar</button>

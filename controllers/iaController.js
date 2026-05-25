@@ -3,10 +3,13 @@ const { v4: uuidv4 } = require("uuid");
 const mammoth = require("mammoth");
 const Tesseract = require("tesseract.js");
 
+// 🚀 IMPORTAÇÃO DOS MODELOS
 const Entidade = require("../models/entidadeModel");
 const Periodo = require("../models/periodoModel");
 const Documento = require("../models/documentoModel");
 const Dado = require("../models/dadoModel");
+const Metrica = require("../models/metricaModel"); 
+const UnidadeMedida = require("../models/unidadeMedidaModel");
 
 let pdf;
 try {
@@ -59,17 +62,42 @@ const extrairTextoFicheiro = async (file) => {
 };
 
 // ─────────────────────────────────────────────
+// CONFIGURAÇÕES GERAIS DE SEGURANÇA
+// ─────────────────────────────────────────────
+
+const METALOGALVA = {
+    id_entidade: "ent_metalogalva",
+    nome: "Metalogalva – Trefilaria e Galvanização, S.A.",
+    tipo_entidade: "EMPRESA",
+    pais: "PT",
+    nif: "500123456"
+};
+
+// 🚀 Lista de Segurança (Fallback para evitar rebentar o base de dados)
+const TIPOS_DOCUMENTO_VALIDOS = [
+    "FATURA", "EPD", "RELATORIO_AUDITORIA", 
+    "RELATORIO_ESG", "XML", "JSON", "ERP", "API", "OUTRO"
+];
+
+// ─────────────────────────────────────────────
 // PROMPTS BASE
 // ─────────────────────────────────────────────
 
 const SYSTEM_PROMPT_BASE = `
 Responde APENAS com um JSON válido. Sem markdown. Sem texto adicional. Não inventes dados. Se não souberes, usa null.
 
+REGRAS CRÍTICAS PARA A ENTIDADE:
+1. O documento É UMA COMPRA feita pela Metalogalva a um FORNECEDOR.
+2. A entidade a extrair é SEMPRE O FORNECEDOR e normalmente aparece como entidade emissora.
+3. NUNCA, em circunstância alguma, uses "Metalogalva" (ou variantes como "Metalogalva SA", "Metalogalva - Trefilaria e Galvanização") como o nome da entidade. Se a Metalogalva estiver no documento, ignora-a e procura a empresa parceira. Se extraíres "Metalogalva", a extração será considerada FALHA CRÍTICA.
+4. Exemplo de extração: Se a fatura é da "Transmaia" para "Metalogalva", a entidade deve ser "Transmaia".
+5. Coloca sempre o texto em portugues de portugal
+
 O JSON deve ter EXATAMENTE esta estrutura:
 {
   "meta": {
     "documento": {
-      "tipo_documento": "FATURA|EPD|CONTRATO|RELATORIO|OUTRO",
+      "tipo_documento": "FATURA|EPD|RELATORIO_AUDITORIA|RELATORIO_ESG|XML|JSON|ERP|API",
       "numero_documento": "string|null",
       "data_emissao": "YYYY-MM-DD|null",
       "fonte_ingestao": "UPLOAD",
@@ -77,7 +105,7 @@ O JSON deve ter EXATAMENTE esta estrutura:
     },
     "entidade": {
       "nome": "string",
-      "tipo_entidade": "FORNECEDOR|CLIENTE|OUTRO",
+      "tipo_entidade": "FORNECEDOR",
       "pais": "ISO 3166-1 alpha-2|null",
       "nif": "string|null"
     },
@@ -102,12 +130,13 @@ O JSON deve ter EXATAMENTE esta estrutura:
 const SYSTEM_PROMPT_EMPRESA = `
 Responde APENAS com um JSON válido. Sem markdown. Sem texto adicional. Não inventes dados. Se não souberes, usa null.
 A entidade emissora deste documento é SEMPRE a Metalogalva – Trefilaria e Galvanização, S.A. (NIF: 500123456, PT).
+Coloca sempre o texto em portugues de portugal
 
 O JSON deve ter EXATAMENTE esta estrutura:
 {
   "meta": {
     "documento": {
-      "tipo_documento": "FATURA|EPD|CONTRATO|RELATORIO|OUTRO",
+      "tipo_documento": "FATURA|EPD|RELATORIO_AUDITORIA|RELATORIO_ESG|XML|JSON|ERP|API",
       "numero_documento": "string|null",
       "data_emissao": "YYYY-MM-DD|null",
       "fonte_ingestao": "UPLOAD",
@@ -131,16 +160,8 @@ O JSON deve ter EXATAMENTE esta estrutura:
 }
 `.trim();
 
-const METALOGALVA = {
-    id_entidade: "ent_metalogalva",
-    nome: "Metalogalva – Trefilaria e Galvanização, S.A.",
-    tipo_entidade: "EMPRESA",
-    pais: "PT",
-    nif: "500123456"
-};
-
 // ─────────────────────────────────────────────
-// RESTRUTURAÇÃO IA: TRATAMENTO DE DUPLICADOS
+// FUNÇÕES DA IA
 // ─────────────────────────────────────────────
 
 const gerarInboundIA = async (texto, nome = null) => {
@@ -166,77 +187,84 @@ const gerarInboundIA = async (texto, nome = null) => {
     }
 
     let r = {};
-    try { r = JSON.parse(c.choices[0].message.content || "{}"); } catch { throw new Error("JSON inválido da IA"); }
+    try { 
+        r = JSON.parse(c.choices[0].message.content || "{}"); 
+        const nomeEntidadeAI = r?.meta?.entidade?.nome || "";
+        if (nomeEntidadeAI.toLowerCase().includes("metalogalva")) {
+            log("⚠️ A IA tentou usar Metalogalva como fornecedor. Forçando modo de busca alternativa.");
+            // Aqui podes tentar limpar o nome ou forçar um erro que obrigue a IA a reprocessar
+            r.meta.entidade.nome = "FORNECEDOR_NAO_IDENTIFICADO"; 
+        }
+    } catch { 
+        throw new Error("JSON inválido da IA"); 
+    }
 
     const nomeEntidadeAI = r?.meta?.entidade?.nome || "UNKNOWN";
     
-    // 1. Verificar se a Entidade já existe na BD por Nome (case insensitive)
     let idEnt = "";
     const entidadeExistente = await Entidade.findOne({ nome: { $regex: new RegExp(`^${nomeEntidadeAI.trim()}$`, "i") } });
     
     if (entidadeExistente) {
         idEnt = entidadeExistente.id_entidade;
-        log(`Entidade Encontrada! Reutilizando ID existente: ${idEnt}`);
     } else {
-        // 2. 🛡️ EXCEÇÃO: Se a IA detetar a Metalogalva, força o ID padrão do sistema
         if (nomeEntidadeAI.toLowerCase().includes("metalogalva")) {
             idEnt = "ent_metalogalva";
-            log(`Exceção Ativada: Detetada Metalogalva no fluxo geral. Forçado ID fixo: ${idEnt}`);
         } else {
-            // 3. Caso contrário, gera o ID limpo baseado no nome do Fornecedor
             const nomeLimpo = nomeEntidadeAI
                 .trim()
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
-                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")      // Remove pontuação
-                .replace(/\b(SA|S\.A\.|LDA|Lda|LIMITADA|SLA|S\.L\.)\b/gi, "") // Remove sufixos comerciais
-                .replace(/\s+/g, "_")                            // Espaços para underscores
-                .toUpperCase();                                  // Caixa alta
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+                .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")      
+                .replace(/\b(SA|S\.A\.|LDA|Lda|LIMITADA|SLA|S\.L\.)\b/gi, "") 
+                .replace(/\s+/g, "_")                              
+                .toUpperCase();                                  
                 
             const sufixoSlug = nomeLimpo || "CUSTOM";
             idEnt = `ENT_${sufixoSlug}`;
-            
-            log(`Nova Entidade detetada. ID gerado de forma semântica: ${idEnt}`);
         }
     }
 
-    // 🛡️ NOVA LOGÍSTICA: Gerar ID de Período Legível por Ano e Mês/Trimestre
-    const dataInicio = r?.meta?.periodo?.data_inicio; // Ex: "2026-05-01"
+    const dataInicio = r?.meta?.periodo?.data_inicio; 
     const tipoPeriodo = r?.meta?.periodo?.tipo_periodo || "MENSAL";
     let idPer = "";
 
     if (dataInicio && dataInicio.includes('-')) {
-        const partes = dataInicio.split('-'); // Divide "2026-05-01" -> ["2026", "05", "01"]
+        const partes = dataInicio.split('-'); 
         const ano = partes[0];
         const mes = partes[1];
         
         if (tipoPeriodo.toUpperCase() === "MENSAL") {
-            idPer = `per_${ano}_M${mes}`; // Ex: per_2026_M05
+            idPer = `per_${ano}_M${mes}`; 
         } else if (tipoPeriodo.toUpperCase() === "TRIMESTRAL") {
             const numMes = parseInt(mes, 10);
-            const tri = Math.ceil(numMes / 3); // Mês 5 / 3 = 1.66 -> Trimestre 2
-            idPer = `per_${ano}_T${tri}`; // Ex: per_2026_T2
+            const tri = Math.ceil(numMes / 3); 
+            idPer = `per_${ano}_T${tri}`; 
         } else {
-            idPer = `per_${ano}_ANUAL`;   // Ex: per_2026_ANUAL
+            idPer = `per_${ano}_ANUAL`;   
         }
     } else {
-        idPer = gerarId("per"); // Fallback caso a IA falhe a data
+        idPer = gerarId("per"); 
     }
-    log(`ID do Período Formatado -> ${idPer}`);
 
     const idDoc = gerarId("doc");
     const agora = new Date().toISOString();
+
+    // 🚀 SANITIZAÇÃO DE SEGURANÇA: Impede que tipos alucinados quebrem a BD
+    let tipoDocIA = r?.meta?.documento?.tipo_documento || "OUTRO";
+    if (!TIPOS_DOCUMENTO_VALIDOS.includes(tipoDocIA)) {
+        log(`Aviso: IA tentou usar tipo inválido '${tipoDocIA}'. Forçado para 'OUTRO'.`);
+        tipoDocIA = "OUTRO";
+    }
 
     return {
         meta: {
             documento: {
                 id_documento: idDoc,
-                tipo_documento: r?.meta?.documento?.tipo_documento || "OUTRO",
+                tipo_documento: tipoDocIA,
                 numero_documento: r?.meta?.documento?.numero_documento || null,
                 data_emissao: r?.meta?.documento?.data_emissao || null,
                 fonte_ingestao: "UPLOAD",
                 ficheiro_origem: nome || null
             },
-            // Se for a exceção da Metalogalva, injeta o objeto estático completo, senão injeta o gerado
             entidade: idEnt === "ent_metalogalva" ? METALOGALVA : {
                 id_entidade: idEnt,
                 nome: entidadeExistente ? entidadeExistente.nome : nomeEntidadeAI.trim(),
@@ -295,40 +323,43 @@ const gerarInboundIAEmpresa = async (texto, nome = null) => {
     let r = {};
     try { r = JSON.parse(c.choices[0].message.content || "{}"); } catch { throw new Error("JSON inválido da IA"); }
 
-    log("STEP IA EMPRESA - parse OK");
-
-    // 🛡️ NOVA LOGÍSTICA: Gerar ID de Período Legível por Ano e Mês/Trimestre (Fluxo Empresa)
-    const dataInicio = r?.meta?.periodo?.data_inicio; // Ex: "2026-05-01"
+    const dataInicio = r?.meta?.periodo?.data_inicio; 
     const tipoPeriodo = r?.meta?.periodo?.tipo_periodo || "MENSAL";
     let idPer = "";
 
     if (dataInicio && dataInicio.includes('-')) {
-        const partes = dataInicio.split('-'); // Divide "2026-05-01" -> ["2026", "05", "01"]
+        const partes = dataInicio.split('-'); 
         const ano = partes[0];
         const mes = partes[1];
         
         if (tipoPeriodo.toUpperCase() === "MENSAL") {
-            idPer = `per_${ano}_M${mes}`; // Ex: per_2026_M05
+            idPer = `per_${ano}_M${mes}`; 
         } else if (tipoPeriodo.toUpperCase() === "TRIMESTRAL") {
             const numMes = parseInt(mes, 10);
             const tri = Math.ceil(numMes / 3);
-            idPer = `per_${ano}_T${tri}`; // Ex: per_2026_T2
+            idPer = `per_${ano}_T${tri}`; 
         } else {
-            idPer = `per_${ano}_ANUAL`;   // Ex: per_2026_ANUAL
+            idPer = `per_${ano}_ANUAL`;   
         }
     } else {
-        idPer = gerarId("per"); // Fallback caso a IA não traga data válida
+        idPer = gerarId("per"); 
     }
-    log(`ID do Período Empresa Formatado -> ${idPer}`);
     
     const idDoc = gerarId("doc");
     const agora = new Date().toISOString();
+
+    // 🚀 SANITIZAÇÃO DE SEGURANÇA: Impede que tipos alucinados quebrem a BD
+    let tipoDocIA = r?.meta?.documento?.tipo_documento || "OUTRO";
+    if (!TIPOS_DOCUMENTO_VALIDOS.includes(tipoDocIA)) {
+        log(`Aviso: IA tentou usar tipo inválido '${tipoDocIA}'. Forçado para 'OUTRO'.`);
+        tipoDocIA = "OUTRO";
+    }
 
     return {
         meta: {
             documento: {
                 id_documento: idDoc,
-                tipo_documento: r?.meta?.documento?.tipo_documento || "OUTRO",
+                tipo_documento: tipoDocIA,
                 numero_documento: r?.meta?.documento?.numero_documento || null,
                 data_emissao: r?.meta?.documento?.data_emissao || null,
                 fonte_ingestao: "UPLOAD",
@@ -362,19 +393,92 @@ const gerarInboundIAEmpresa = async (texto, nome = null) => {
 };
 
 // ─────────────────────────────────────────────
-// DB
+// 🚀 AUTO-DISCOVERY: GARANTIR MÉTRICAS E UNIDADES
+// ─────────────────────────────────────────────
+
+const garantirDependenciasBase = async (dadosExtraidos) => {
+    log("STEP DB - Verificando e Autocriando Dependências (Métricas e Unidades)");
+
+    const unitsSet = new Set();
+    const metricsMap = new Map();
+
+    for (const d of dadosExtraidos) {
+        if (d.id_unidade_original) unitsSet.add(d.id_unidade_original.toUpperCase().trim());
+        if (d.id_unidade_base_esperada) unitsSet.add(d.id_unidade_base_esperada.toUpperCase().trim());
+        
+        if (d.id_metrica) {
+            if (!metricsMap.has(d.id_metrica)) {
+                metricsMap.set(d.id_metrica, d.id_unidade_base_esperada || d.id_unidade_original || 'UNIDADE_DESCONHECIDA');
+            }
+        }
+    }
+
+    unitsSet.add('UNIDADE_DESCONHECIDA');
+
+    for (const u of unitsSet) {
+        let tipoInferido = 'MASSA';
+        
+        if (u.includes('CO2')) tipoInferido = 'EMISSOES';
+        else if (u.includes('WH') || u.includes('JOULE')) tipoInferido = 'ENERGIA';
+        else if (u.includes('L') || u.includes('M3')) tipoInferido = 'VOLUME';
+        else if (u.includes('EUR') || u.includes('USD')) tipoInferido = 'MONETARIO';
+        else if (u.includes('%')) tipoInferido = 'PERCENTAGEM';
+        else if (u.includes('DIA') || u.includes('HORA')) tipoInferido = 'TEMPO';
+
+        await UnidadeMedida.findOneAndUpdate(
+            { id_unidade: u },
+            {
+                $setOnInsert: {
+                    id_unidade: u,
+                    nome: u === 'UNIDADE_DESCONHECIDA' ? 'Unidade Desconhecida' : u,
+                    simbolo: u === 'UNIDADE_DESCONHECIDA' ? '?' : u,
+                    tipo_unidade: tipoInferido
+                }
+            },
+            { upsert: true, new: true, runValidators: true }
+        );
+    }
+
+    for (const [id_metrica, id_unidade_ref] of metricsMap.entries()) {
+        const nomeFormatado = id_metrica.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        
+        await Metrica.findOneAndUpdate(
+            { id_metrica: id_metrica },
+            {
+                $setOnInsert: {
+                    id_metrica: id_metrica,
+                    nome: nomeFormatado,
+                    pilar: 'AMBIENTAL',
+                    subcategoria: 'Extração IA',
+                    natureza: 'INPUT',
+                    id_unidade_base: id_unidade_ref ? id_unidade_ref.toUpperCase().trim() : 'UNIDADE_DESCONHECIDA',
+                    ativo: true
+                }
+            },
+            { upsert: true, new: true, runValidators: true }
+        );
+    }
+};
+
+// ─────────────────────────────────────────────
+// DB SAVING LOGIC
 // ─────────────────────────────────────────────
 
 const safeUpsert = async (Model, query, data) => {
     log(`DB UPSERT -> ${Model.modelName}`);
     return Model.findOneAndUpdate(query, data, {
         upsert: true,
-        new: true
+        new: true,
+        runValidators: true
     });
 };
 
 const guardarInboundBD = async (i) => {
     log("STEP DB - início");
+
+    if (i.dados && i.dados.length > 0) {
+        await garantirDependenciasBase(i.dados);
+    }
 
     const entidade = await safeUpsert(
         Entidade,
@@ -427,7 +531,7 @@ const extrairDadosDocumentoFicheiro = async (req, res) => {
         return res.status(200).json({
             sucesso: true,
             mensagem: "OK",
-			inbound_json: inbound,
+            inbound_json: inbound,
             bd_registos: {
                 entidade: bd.entidade.id_entidade,
                 periodo: bd.periodo.id_periodo,
@@ -453,7 +557,7 @@ const extrairDadosDocumento = async (req, res) => {
         return res.status(200).json({
             sucesso: true,
             mensagem: "OK",
-			inbound_json: inbound,
+            inbound_json: inbound,
             bd_registos: {
                 entidade: bd.entidade.id_entidade,
                 periodo: bd.periodo.id_periodo,
@@ -479,7 +583,7 @@ const extrairDadosDocumentoFicheiroEmpresa = async (req, res) => {
         return res.status(200).json({
             sucesso: true,
             mensagem: "OK",
-			inbound_json: inbound,
+            inbound_json: inbound,
             bd_registos: {
                 entidade: bd.entidade.id_entidade,
                 periodo: bd.periodo.id_periodo,
@@ -505,7 +609,7 @@ const extrairDadosDocumentoEmpresa = async (req, res) => {
         return res.status(200).json({
             sucesso: true,
             mensagem: "OK",
-			inbound_json: inbound,
+            inbound_json: inbound,
             bd_registos: {
                 entidade: bd.entidade.id_entidade,
                 periodo: bd.periodo.id_periodo,

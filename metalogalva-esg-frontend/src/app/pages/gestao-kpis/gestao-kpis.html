@@ -10,13 +10,9 @@
     </button>
   </header>
 
-  <!-- FEEDBACK GLOBAL -->
   <div class="alert sucesso" *ngIf="mensagemSucesso">✅ {{ mensagemSucesso }}</div>
   <div class="alert erro" *ngIf="mensagemErro && !mostrarFormulario">❌ {{ mensagemErro }}</div>
 
-  <!-- ════════════════════════════════════════
-       FORMULÁRIO
-  ════════════════════════════════════════ -->
   <div class="form-card" *ngIf="mostrarFormulario">
 
     <h2>{{ modoEdicao ? '✏️ Editar KPI' : '➕ Novo KPI' }}</h2>
@@ -25,13 +21,11 @@
 
     <div class="form-grid">
 
-      <!-- NOME -->
       <div class="campo">
         <label>Nome <span class="obrigatorio">*</span></label>
         <input [(ngModel)]="form.nome" placeholder="ex: Pegada de Carbono Total — Scope 1" />
       </div>
 
-      <!-- TIPO AGREGAÇÃO -->
       <div class="campo">
         <label>Tipo de Agregação <span class="obrigatorio">*</span></label>
         <select [(ngModel)]="form.tipo_agregacao">
@@ -40,106 +34,91 @@
         </select>
       </div>
 
-      <!-- FÓRMULA -->
-      <!-- FÓRMULA -->
-<div class="campo campo-formula">
-    <label>Fórmula <span class="obrigatorio">*</span></label>
+      <div class="campo campo-formula">
+        <label>Fórmula <span class="obrigatorio">*</span></label>
 
-    <!-- Sem fórmula ainda -->
-    <div *ngIf="!form.formula_ast" class="formula-vazia">
-        <p>Nenhuma fórmula definida.</p>
-        <button type="button" class="btn-iniciar-formula" (click)="iniciarFormula()">
+        <div *ngIf="!form.formula_ast" class="formula-vazia">
+          <p>Nenhuma fórmula definida.</p>
+          <button type="button" class="btn-iniciar-formula" (click)="iniciarFormula()">
             ➕ Construir Fórmula
-        </button>
-    </div>
+          </button>
+        </div>
 
-    <!-- Construtor -->
-    <div *ngIf="form.formula_ast" class="formula-builder">
+        <div *ngIf="form.formula_ast" class="formula-builder">
 
-        <!-- Preview legível -->
-        <div class="formula-preview">
+          <div class="formula-preview">
             <span class="preview-label">Preview:</span>
             <code>{{ renderizarFormula(form.formula_ast) }}</code>
-        </div>
+          </div>
 
-        <!-- Árvore recursiva -->
-        <div class="formula-arvore">
+          <div class="formula-arvore">
             <ng-container
-                *ngTemplateOutlet="noTemplate; context: { no: form.formula_ast, pai: null, lado: null }">
+              *ngTemplateOutlet="noTemplate; context: { no: form.formula_ast, pai: null, lado: null }">
             </ng-container>
-        </div>
+          </div>
 
-        <button type="button" class="btn-limpar-formula" (click)="limparFormula()">
+          <button type="button" class="btn-limpar-formula" (click)="limparFormula()">
             🗑️ Limpar Fórmula
-        </button>
-    </div>
-</div>
+          </button>
+        </div>
+      </div>
 
-<!-- TEMPLATE RECURSIVO DA ÁRVORE -->
-<ng-template #noTemplate let-no="no" let-pai="pai" let-lado="lado">
+      <ng-template #noTemplate let-no="no" let-pai="pai" let-lado="lado">
 
-    <!-- NÓ FOLHA: métrica -->
-    <div *ngIf="isMetrica(no)" class="no-metrica">
-        <select [(ngModel)]="no.metrica" [name]="'m_' + no.metrica">
-            <option value="">— Selecionar métrica —</option>
-            <option *ngFor="let m of metricas" [value]="m.id_metrica">
-                {{ m.nome }}
+        <div *ngIf="isDado(no)" class="no-dado">
+          <select [(ngModel)]="no.dado" [ngModelOptions]="{standalone: true}">
+            <option value="">— Selecionar Dado Extraído —</option>
+            <option *ngFor="let d of dados" [value]="d.id_dado">
+              {{ d.nome_limpo }} ({{ d.valor }})
             </option>
-        </select>
-        <!-- Expandir para sub-operação -->
-        <button
+          </select>
+          <button
             *ngIf="pai"
             type="button"
             class="btn-no btn-expandir"
             title="Transformar em operação"
             (click)="expandirNo(pai, lado)">
             ƒ
-        </button>
-    </div>
-
-    <!-- NÓ OPERAÇÃO -->
-    <div *ngIf="isOperacao(no)" class="no-operacao">
-
-        <div class="no-operacao-inner">
-
-            <!-- LADO ESQUERDO -->
-            <div class="no-filho">
-                <ng-container
-                    *ngTemplateOutlet="noTemplate; context: { no: no.left, pai: no, lado: 'left' }">
-                </ng-container>
-            </div>
-
-            <!-- OPERADOR -->
-            <div class="no-operador">
-                <select [(ngModel)]="no.op" [name]="'op_' + no.op">
-                    <option *ngFor="let o of operadores" [value]="o.valor">
-                        {{ o.simbolo }} {{ o.label }}
-                    </option>
-                </select>
-                <!-- Colapsar de volta a métrica simples -->
-                <button
-                    *ngIf="pai"
-                    type="button"
-                    class="btn-no btn-colapsar"
-                    title="Simplificar para métrica"
-                    (click)="colapsarNo(pai, lado)">
-                    ✕
-                </button>
-            </div>
-
-            <!-- LADO DIREITO -->
-            <div class="no-filho">
-                <ng-container
-                    *ngTemplateOutlet="noTemplate; context: { no: no.right, pai: no, lado: 'right' }">
-                </ng-container>
-            </div>
-
+          </button>
         </div>
-    </div>
 
-</ng-template>
+        <div *ngIf="isOperacao(no)" class="no-operacao">
 
-      <!-- UNIDADE DE RESULTADO -->
+          <div class="no-operacao-inner">
+
+            <div class="no-filho">
+              <ng-container
+                *ngTemplateOutlet="noTemplate; context: { no: no.left, pai: no, lado: 'left' }">
+              </ng-container>
+            </div>
+
+            <div class="no-operador">
+              <select [(ngModel)]="no.op" [name]="'op_' + no.op">
+                <option *ngFor="let o of operadores" [value]="o.valor">
+                  {{ o.simbolo }} {{ o.label }}
+                </option>
+              </select>
+              <button
+                *ngIf="pai"
+                type="button"
+                class="btn-no btn-colapsar"
+                title="Simplificar para métrica"
+                (click)="colapsarNo(pai, lado)">
+                ✕
+              </button>
+            </div>
+
+            <div class="no-filho">
+              <ng-container
+                *ngTemplateOutlet="noTemplate; context: { no: no.right, pai: no, lado: 'right' }">
+              </ng-container>
+            </div>
+
+          </div>
+        </div>
+
+      </ng-template>
+
       <div class="campo campo-unidade">
         <label>Unidade de Resultado <span class="obrigatorio">*</span></label>
 
@@ -171,13 +150,11 @@
           placeholder="ex: tco2e, kwh, eur" />
       </div>
 
-      <!-- NORMA -->
       <div class="campo">
         <label>Norma de Referência <span class="opcional">(opcional)</span></label>
         <input [(ngModel)]="form.norma_referencia" placeholder="ex: GRI 305-1, ESRS E1-6" />
       </div>
 
-      <!-- ATIVO -->
       <div class="campo campo-toggle">
         <label>Estado</label>
         <label class="switch">
@@ -201,9 +178,6 @@
 
   </div>
 
-  <!-- ════════════════════════════════════════
-       TABELA
-  ════════════════════════════════════════ -->
   <div class="tabela-wrapper">
 
     <div class="a-carregar" *ngIf="aCarregar">
@@ -251,9 +225,6 @@
     </table>
   </div>
 
-  <!-- ════════════════════════════════════════
-       MODAL CONFIRMAR ELIMINAÇÃO
-  ════════════════════════════════════════ -->
   <div class="modal-overlay" *ngIf="kpiAEliminar">
     <div class="modal">
       <h3>⚠️ Confirmar Eliminação</h3>

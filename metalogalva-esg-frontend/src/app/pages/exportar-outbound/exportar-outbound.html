@@ -11,9 +11,11 @@
       <label>Selecione o Período Crítico de Análise:</label>
       <select [(ngModel)]="idPeriodoSelecionado" [disabled]="aCarregar || aProcessar">
         <option value="">— Escolha o período (Ex: Ano / Mês) —</option>
+        
         <option *ngFor="let p of periodos" [value]="p.id_periodo">
-          {{ p.id_periodo }} [{{ p.tipo_periodo }}]
+          {{ p.labelLegivel }}
         </option>
+        
       </select>
     </div>
 

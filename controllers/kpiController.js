@@ -74,6 +74,9 @@ const obterKPIPorId = async (req, res) => {
 
 const atualizarKPI = async (req, res) => {
     try {
+        const { id } = req.params;
+        
+        // 1. Validar se a unidade existe (mantido igual)
         if (req.body.id_unidade_resultado) {
             const unidadeExiste = await UnidadeMedida.findOne({ id_unidade: req.body.id_unidade_resultado });
             if (!unidadeExiste) {
@@ -81,16 +84,34 @@ const atualizarKPI = async (req, res) => {
             }
         }
 
-        const kpiAtualizado = await KPI.findOneAndUpdate(
-            { id_kpi: req.params.id },
-            req.body,
-            { new: true, runValidators: true }
-        ).populate('id_unidade_resultado', 'nome simbolo');
+        // 2. FILTRAGEM DE SEGURANÇA: Garantir que só passamos campos que o Mongoose conhece
+        // Isto elimina campos "sujos" enviados pelo Angular (como unidade_modo)
+        const camposPermitidos = {
+            nome: req.body.nome,
+            tipo_agregacao: req.body.tipo_agregacao,
+            formula: req.body.formula, // Já vem stringificada do Angular
+            id_unidade_resultado: req.body.id_unidade_resultado,
+            norma_referencia: req.body.norma_referencia,
+            ativo: req.body.ativo
+        };
 
-        if (!kpiAtualizado) return res.status(404).json({ sucesso: false, mensagem: "KPI não encontrado." });
+        // 3. Atualizar e fazer o populate
+        const kpiAtualizado = await KPI.findOneAndUpdate(
+            { id_kpi: id },
+            { $set: camposPermitidos }, 
+            { new: true, runValidators: true }
+        );
+
+        if (!kpiAtualizado) {
+            return res.status(404).json({ sucesso: false, mensagem: "KPI não encontrado." });
+        }
 
         res.status(200).json({ sucesso: true, mensagem: "KPI atualizado.", dados: kpiAtualizado });
+        
     } catch (error) {
+        // Log para veres o erro real no terminal
+        console.error("Erro detalhado do Mongoose:", error);
+        
         if (error.name === 'ValidationError') {
             return res.status(400).json({ sucesso: false, erro: error.message });
         }

@@ -1,10 +1,10 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { ApiService } from '../../services/api';
 
-// ── Interface atualizada com TODOS os campos do teu Schema ──
 interface FormDado {
     id_documento: string;
     id_metrica: string;
@@ -37,7 +37,6 @@ export class GestaoDadosComponent implements OnInit {
     periodos: any[] = [];
     unidades: any[] = [];
     
-    // Enums extraídos do teu Schema
     estadosValidos = ['PENDENTE', 'VALIDADO', 'REJEITADO', 'ESTIMADO'];
     origensValidas = ['EXTRACAO_IA', 'MANUAL', 'IMPORTACAO', 'API'];
 
@@ -45,12 +44,10 @@ export class GestaoDadosComponent implements OnInit {
     filtroOrigem = '';
     filtroTexto = '';
 
-    // Formulário
     form: FormDado = this.gerarFormVazio();
     dadoEmEdicao: any = null;
     mostrarFormulario = false;
 
-    // UI
     aCarregar = false;
     aGuardar = false;
     mensagemSucesso = '';
@@ -80,53 +77,85 @@ export class GestaoDadosComponent implements OnInit {
     // ======================
     carregarTudo(): void {
         this.aCarregar = true;
-        let pedidosPendentes = 5; // Temos 5 chamadas à API
 
-        const concluirPedido = () => {
-            pedidosPendentes--;
-            if (pedidosPendentes === 0) {
+        // 🚀 O FORKJOIN GARANTE QUE SÓ DESENHAMOS O ECRÃ QUANDO TUDO CHEGAR
+        forkJoin({
+            dadosResult: this.api.obterDados(),
+            metricasResult: this.api.obterMetricas(),
+            entidadesResult: this.api.obterEntidades(),
+            periodosResult: this.api.obterPeriodos(),
+            unidadesResult: this.api.obterUnidades()
+        }).pipe(
+            finalize(() => {
                 this.aCarregar = false;
-                this.cdr.detectChanges(); // O ecrã atualiza quando tudo chegar!
+                this.cdr.detectChanges();
+            })
+        ).subscribe({
+            next: (res: any) => {
+                this.metricas = res.metricasResult?.dados ?? [];
+                this.entidades = res.entidadesResult?.dados ?? [];
+                this.unidades = res.unidadesResult?.dados ?? [];
+
+                // 🚀 1. MOTOR DE TRADUÇÃO DOS PERÍODOS
+                const periodosBrutos = res.periodosResult?.dados ?? [];
+                this.periodos = periodosBrutos.map((p: any) => {
+                    let labelLegivel = p.id_periodo || 'Período Indefinido';
+                    if (p.id_periodo) {
+                        const idUpper = p.id_periodo.toUpperCase().trim();
+                        const matchSimples = idUpper.match(/^(\d{4})-[QT]([1-4])$/);
+                        const matchPrefixado = idUpper.match(/^PER_(\d{4})_[QT]([1-4])$/);
+                        const matchAnoSimples = idUpper.match(/^(\d{4})$/);
+
+                        if (matchSimples) labelLegivel = `Trimestre ${matchSimples[2]}, Ano ${matchSimples[1]}`;
+                        else if (matchPrefixado) labelLegivel = `Trimestre ${matchPrefixado[2]}, Ano ${matchPrefixado[1]}`;
+                        else if (matchAnoSimples) labelLegivel = `Ano ${matchAnoSimples[1]}`;
+                        else if (idUpper.includes('ANUAL')) {
+                            const ano = idUpper.replace(/[^0-9]/g, '');
+                            labelLegivel = `Ano ${ano}`;
+                        } else if (idUpper.includes('M')) {
+                            const matchMensal = idUpper.match(/(?:PER_)?(\d{4})_M(\d{2})/);
+                            if (matchMensal) labelLegivel = `Mês ${matchMensal[2]}, Ano ${matchMensal[1]}`;
+                        }
+                    }
+                    return { ...p, labelLegivel };
+                });
+
+                // 🚀 2. CRIAR DICIONÁRIOS RÁPIDOS PARA A TABELA
+                const mapaEntidades = new Map(this.entidades.map(e => [e.id_entidade, e.nome]));
+                const mapaPeriodos = new Map(this.periodos.map(p => [p.id_periodo, p.labelLegivel]));
+                const mapaMetricas = new Map(this.metricas.map(m => [m.id_metrica, m.nome]));
+
+                // 🚀 3. INJETAR OS NOMES TRADUZIDOS EM CADA DADO DA TABELA
+                const dadosBrutos = res.dadosResult?.dados ?? [];
+                this.dados = dadosBrutos.map((d: any) => {
+                    
+                    // Aproveitamos para limpar também o nome da métrica!
+                    let nomeMetrica = mapaMetricas.get(d.id_metrica) || d.id_metrica || '';
+                    nomeMetrica = nomeMetrica.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+                    return {
+                        ...d,
+                        nome_entidade: mapaEntidades.get(d.id_entidade) || d.id_entidade,
+                        nome_periodo: mapaPeriodos.get(d.id_periodo) || d.id_periodo,
+                        nome_metrica: nomeMetrica
+                    };
+                });
+
+                this.aplicarFiltros();
+            },
+            error: (e) => {
+                console.error('❌ Falha ao carregar dados:', e);
+                this.mostrarErro('Falha ao comunicar com o servidor. Verifica a ligação à base de dados.');
             }
-        };
-
-        // 1. Tabela Principal (Dados)
-        this.api.obterDados().subscribe({
-            next: (r) => { this.dados = r.dados ?? []; this.aplicarFiltros(); concluirPedido(); },
-            error: (e) => { console.error('❌ Falha nos Dados:', e); concluirPedido(); }
-        });
-
-        // 2. Lista de Métricas
-        this.api.obterMetricas().subscribe({
-            next: (r) => { this.metricas = r.dados ?? []; concluirPedido(); },
-            error: (e) => { console.error('❌ Falha nas Métricas:', e); concluirPedido(); }
-        });
-
-        // 3. Lista de Entidades
-        this.api.obterEntidades().subscribe({
-            next: (r) => { this.entidades = r.dados ?? []; concluirPedido(); },
-            error: (e) => { console.error('❌ Falha nas Entidades:', e); concluirPedido(); }
-        });
-
-        // 4. Lista de Períodos
-        this.api.obterPeriodos().subscribe({
-            next: (r) => { this.periodos = r.dados ?? []; concluirPedido(); },
-            error: (e) => { console.error('❌ Falha nos Períodos:', e); concluirPedido(); }
-        });
-
-        // 5. Lista de Unidades
-        this.api.obterUnidades().subscribe({
-            next: (r) => { this.unidades = r.dados ?? []; concluirPedido(); },
-            error: (e) => { console.error('❌ Falha nas Unidades:', e); concluirPedido(); }
         });
     }
 
     aplicarFiltros(): void {
         this.dadosFiltrados = this.dados.filter(d => {
+            // Atualizámos o filtro de texto para pesquisar pelos nomes bonitos e não pelos IDs!
             const textoOk = !this.filtroTexto ||
-                d.id_dado?.toLowerCase().includes(this.filtroTexto.toLowerCase()) ||
-                d.id_metrica?.toLowerCase().includes(this.filtroTexto.toLowerCase()) ||
-                d.id_entidade?.toLowerCase().includes(this.filtroTexto.toLowerCase());
+                d.nome_metrica?.toLowerCase().includes(this.filtroTexto.toLowerCase()) ||
+                d.nome_entidade?.toLowerCase().includes(this.filtroTexto.toLowerCase());
             
             const estadoOk = !this.filtroEstado || d.estado_validacao === this.filtroEstado;
             const origemOk = !this.filtroOrigem || d.origem === this.filtroOrigem;
@@ -149,7 +178,6 @@ export class GestaoDadosComponent implements OnInit {
     abrirFormEdicao(dado: any): void {
         this.dadoEmEdicao = dado;
         
-        // Mapeamento direto de todos os campos da base de dados para o formulário
         this.form = {
             id_documento: dado.id_documento ?? '',
             id_metrica: dado.id_metrica ?? '',
@@ -192,7 +220,6 @@ export class GestaoDadosComponent implements OnInit {
         this.aGuardar = true;
         this.limparMensagens();
 
-        // Envia o objeto completo (exatamente como desenhaste no Schema)
         const payload = {
             id_documento: this.form.id_documento.trim() || null,
             id_metrica: this.form.id_metrica.trim(),

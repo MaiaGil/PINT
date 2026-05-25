@@ -19,7 +19,7 @@
         <label>Período Relatório</label>
         <select [(ngModel)]="filtroPeriodo" (change)="limparDestaqueEAtualizar()">
           <option value="">— Todos os Períodos —</option>
-          <option *ngFor="let per of listaPeriodos" [value]="per.id_periodo">{{ per.id_periodo }}</option>
+          <option *ngFor="let per of listaPeriodos" [value]="per.id_periodo">{{ per.labelLegivel }}</option>
         </select>
       </div>
 
