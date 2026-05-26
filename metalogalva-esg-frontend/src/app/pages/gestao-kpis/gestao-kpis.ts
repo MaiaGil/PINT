@@ -5,7 +5,6 @@ import { ApiService } from '../../services/api';
 import { forkJoin } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
-
 // ── Tipos da fórmula ───────────────────────────────────
 
 type Operador = 'SUM' | 'SUB' | 'MUL' | 'DIV' | 'AVG';
@@ -105,7 +104,6 @@ export class GestaoKpisComponent implements OnInit {
             error: (e) => { console.error('❌ Falha nas Unidades:', e); concluirPedido(); }
         });
 
-        // 🚀 FILTRO DE DADOS ÚNICOS (Remove as repetições e guarda a formatação limpa)
         this.api.obterDados().subscribe({
             next: (r) => { 
                 const dadosBrutos = r.dados ?? [];
@@ -114,7 +112,6 @@ export class GestaoKpisComponent implements OnInit {
                 dadosBrutos.forEach((d: any) => {
                     const metricaChave = d.id_metrica || 'desconhecido';
 
-                    // Se esta métrica ainda não estiver na lista, adicionamos
                     if (!mapaUnicos.has(metricaChave)) {
                         const nomeTratado = metricaChave
                             .replace(/_/g, ' ')
@@ -127,7 +124,6 @@ export class GestaoKpisComponent implements OnInit {
                     }
                 });
 
-                // Transforma o mapa de volta num array e ordena alfabeticamente
                 this.dados = Array.from(mapaUnicos.values());
                 this.dados.sort((a, b) => a.nome_limpo.localeCompare(b.nome_limpo));
 
@@ -183,7 +179,6 @@ export class GestaoKpisComponent implements OnInit {
         this.aGuardar = true;
         this.limparMensagens();
 
-        // 🚀 A MÁGICA: Em vez de stringify do AST, enviamos a string legível
         const formulaLegivel = this.renderizarFormula(this.form.formula_ast);
 
         const payload = {
@@ -273,9 +268,97 @@ export class GestaoKpisComponent implements OnInit {
     isOperacao(no: No): no is NoOperacao { return no.tipo === 'operacao'; }
     isDado(no: No): no is NoDado { return no.tipo === 'dado'; }
 
+    // ─────────────────────────────────────────────────────────────────
+    // 🚀 PARSER INTELIGENTE: LÊ TEXTO OU JSON E RECONSTRÓI A ÁRVORE
+    // ─────────────────────────────────────────────────────────────────
     private parsearFormula(formula: string): No | null {
-        try { return this.migrarFormulaAntiga(JSON.parse(formula)); } 
-        catch { return null; }
+        if (!formula) return null;
+        formula = formula.trim();
+
+        // Retrocompatibilidade: Se a fórmula antiga guardada for JSON puro, faz o fluxo antigo
+        if (formula.startsWith('{') || formula.startsWith('[')) {
+            try { return this.migrarFormulaAntiga(JSON.parse(formula)); } 
+            catch { return null; }
+        }
+
+        // Fluxo Novo: Reconstrói recursivamente a árvore a partir do texto plano (ex: "(Dado A + Dado B)")
+        return this.converterStringParaAst(formula);
+    }
+
+    private converterStringParaAst(formulaStr: string): No | null {
+        if (!formulaStr) return null;
+        formulaStr = formulaStr.trim();
+
+        // Caso A: Operação de Média — AVG(left, right)
+        if (formulaStr.startsWith('AVG(') && formulaStr.endsWith(')')) {
+            const interior = formulaStr.substring(4, formulaStr.length - 1);
+            let nivel = 0;
+            let posVirgula = -1;
+
+            for (let i = 0; i < interior.length; i++) {
+                if (interior[i] === '(') nivel++;
+                if (interior[i] === ')') nivel--;
+                if (interior[i] === ',' && nivel === 0) {
+                    posVirgula = i;
+                    break;
+                }
+            }
+
+            if (posVirgula !== -1) {
+                return {
+                    tipo: 'operacao',
+                    op: 'AVG',
+                    left: this.converterStringParaAst(interior.substring(0, posVirgula))!,
+                    right: this.converterStringParaAst(interior.substring(posVirgula + 1))!
+                } as NoOperacao;
+            }
+        }
+
+        // Caso B: Operações normais envelopadas em parênteses — (left OP right)
+        if (formulaStr.startsWith('(') && formulaStr.endsWith(')')) {
+            const interior = formulaStr.substring(1, formulaStr.length - 1);
+            let nivel = 0;
+            let posOp = -1;
+            let simboloEncontrado = '';
+            const simbolos = ['+', '−', '×', '÷'];
+
+            for (let i = 0; i < interior.length; i++) {
+                if (interior[i] === '(') nivel++;
+                if (interior[i] === ')') nivel--;
+                if (nivel === 0 && simbolos.includes(interior[i])) {
+                    posOp = i;
+                    simboloEncontrado = interior[i];
+                    break;
+                }
+            }
+
+            if (posOp !== -1) {
+                let opEnum: Operador = 'SUM';
+                if (simboloEncontrado === '+') opEnum = 'SUM';
+                if (simboloEncontrado === '−') opEnum = 'SUB';
+                if (simboloEncontrado === '×') opEnum = 'MUL';
+                if (simboloEncontrado === '÷') opEnum = 'DIV';
+
+                return {
+                    tipo: 'operacao',
+                    op: opEnum,
+                    left: this.converterStringParaAst(interior.substring(0, posOp))!,
+                    right: this.converterStringParaAst(interior.substring(posOp + 1))!
+                } as NoOperacao;
+            }
+        }
+
+        // Caso C: Nó Folha (Texto limpo do Dado)
+        if (formulaStr === '?' || !formulaStr) {
+            return { tipo: 'dado', dado: '' };
+        }
+
+        // Mapeia o texto de volta para o ID real do Dado associado
+        const d = this.dados.find(x => x.nome_limpo.toLowerCase() === formulaStr.toLowerCase() || x.id_dado === formulaStr);
+        return {
+            tipo: 'dado',
+            dado: d ? d.id_dado : formulaStr
+        } as NoDado;
     }
 
     private migrarFormulaAntiga(no: any): No {

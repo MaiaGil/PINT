@@ -5,7 +5,10 @@
     <p>Processamento automático de faturas, relatórios ESG, OCR e documentos da cadeia de valor Scope 3.</p>
   </header>
 
-  <!-- SELETOR DE MODO -->
+  <div class="alert sucesso" *ngIf="mensagemSucesso" style="margin-bottom: 20px; padding: 15px; background-color: #d4edda; color: #155724; border-radius: 6px; font-weight: bold;">
+    ✅ {{ mensagemSucesso }}
+  </div>
+
   <div class="modo-selector">
     <button
       [class.ativo]="modo === 'fornecedor'"
@@ -28,7 +31,6 @@
 
   <div class="opcoes-container">
 
-    <!-- TEXTO -->
     <div class="input-area">
       <h3>📝 Colar Texto do Documento</h3>
 
@@ -36,12 +38,12 @@
         [(ngModel)]="textoDocumento"
         placeholder="Cola aqui o texto do documento..."
         rows="8"
-        [disabled]="aProcessar">
+        [disabled]="aProcessar || exibirConfirmacao">
       </textarea>
 
       <button
         (click)="processarDocumento()"
-        [disabled]="aProcessar || !textoDocumento.trim() || !!ficheiroSelecionado">
+        [disabled]="aProcessar || !textoDocumento.trim() || !!ficheiroSelecionado || exibirConfirmacao">
         <span *ngIf="!aProcessar">🚀 Extrair Documento</span>
         <span *ngIf="aProcessar">🤖 A analisar documento...</span>
       </button>
@@ -51,7 +53,6 @@
       <hr><span>OU</span>
     </div>
 
-    <!-- UPLOAD -->
     <div class="input-area upload-area">
       <h3>📎 Upload de Documento</h3>
       <p class="upload-info">PDF, TXT, DOCX, PNG, JPG</p>
@@ -60,7 +61,7 @@
         type="file"
         (change)="onFileSelected($event)"
         accept=".pdf,.txt,.docx,.png,.jpg,.jpeg"
-        [disabled]="aProcessar">
+        [disabled]="aProcessar || exibirConfirmacao">
 
       <div class="ficheiro-selecionado" *ngIf="ficheiroSelecionado">
         <strong>Ficheiro:</strong> {{ ficheiroSelecionado.name }}
@@ -69,7 +70,7 @@
       <button
         class="upload-btn"
         (click)="processarUpload()"
-        [disabled]="aProcessar || !ficheiroSelecionado || textoDocumento.trim().length > 0">
+        [disabled]="aProcessar || !ficheiroSelecionado || textoDocumento.trim().length > 0 || exibirConfirmacao">
         <span *ngIf="!aProcessar">📤 Upload e Extrair</span>
         <span *ngIf="aProcessar">🔍 OCR + IA em execução...</span>
       </button>
@@ -84,54 +85,64 @@
 
   </div>
 
-  <!-- ERRO -->
   <div class="error-box" *ngIf="mensagemErro">
     ❌ {{ mensagemErro }}
   </div>
 
-  <!-- A PROCESSAR -->
   <div class="processing-box" *ngIf="aProcessar">
     <div class="loader"></div>
     <p>Processamento em execução...</p>
   </div>
 
-  <!-- RESULTADO -->
-  <div class="resultado-area" *ngIf="resultadoIA">
-
-    <div class="sucesso-banner">
-      ✅ {{ resultadoIA.mensagem }}
+  <div class="confirmacao-area" *ngIf="exibirConfirmacao">
+    <div style="background: #fff3cd; color: #856404; padding: 15px; border-left: 5px solid #ffeeba; margin-bottom: 20px; border-radius: 4px;">
+      <strong>⚠️ Validação Necessária:</strong> Os dados foram extraídos. Por favor, reveja a informação gerada pela IA antes de a injetar definitivamente na Base de Dados.
     </div>
 
-    <div class="acoes-container">
+    <div class="acoes-decisao" style="display: flex; gap: 15px; margin-bottom: 20px;">
+      <button (click)="confirmarGravacao()" style="background-color: #27ae60; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; flex: 1; font-size: 1.1rem;">
+        ✅ Aceitar e Gravar na BD
+      </button>
+      <button (click)="negarGravacao()" style="background-color: #e74c3c; color: white; padding: 12px 24px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; flex: 1; font-size: 1.1rem;">
+        ❌ Negar / Descartar
+      </button>
+    </div>
+
+    <div class="card json-viewer" *ngIf="inboundJson">
+      <h3>🔍 inbound.json (Pré-visualização)</h3>
+      <pre>{{ formatarJson(inboundJson) }}</pre>
+    </div>
+  </div>
+
+  <div class="resultado-area" *ngIf="resultadoIA && !exibirConfirmacao">
+
+    <div class="acoes-container" style="margin-bottom: 20px;">
       <button class="download-btn" (click)="descarregarInbound()" [disabled]="!inboundJson">
         ⬇️ Download inbound.json
       </button>
       <button class="clear-btn" (click)="limparResultado()">
-        🗑️ Limpar
+        🧹 Limpar Ecrã
       </button>
     </div>
 
     <div class="grid-resultados">
 
-      <!-- META -->
       <div class="card">
         <h3>📄 Registo BD</h3>
         <ul>
           <li><strong>ID Documento:</strong> {{ resultadoIA.bd_registos?.documento }}</li>
           <li><strong>ID Entidade:</strong> {{ resultadoIA.bd_registos?.entidade }}</li>
           <li><strong>ID Período:</strong> {{ resultadoIA.bd_registos?.periodo }}</li>
-          <li><strong>Dados Inseridos:</strong> {{ resultadoIA.bd_registos?.dados }}</li>
-          <li><strong>Tipo Documento:</strong> {{ resultadoIA.bd_registos?.documento | uppercase }}</li>
+          <li><strong>Dados Inseridos:</strong> {{ resultadoIA.bd_registos?.dados }} registos</li>
+          <li><strong>Tipo Documento:</strong> {{ resultadoIA.bd_registos?.tipo_documento | uppercase }}</li>
         </ul>
       </div>
 
-      <!-- INBOUND JSON -->
       <div class="card json-viewer" *ngIf="inboundJson">
-        <h3>📦 inbound.json</h3>
+        <h3>📦 inbound.json Gravado</h3>
         <pre>{{ formatarJson(inboundJson) }}</pre>
       </div>
 
-      <!-- RESPOSTA COMPLETA (fallback quando não há inbound_json) -->
       <div class="card json-viewer" *ngIf="!inboundJson">
         <h3>📦 Resposta Servidor</h3>
         <pre>{{ formatarJson(resultadoIA) }}</pre>

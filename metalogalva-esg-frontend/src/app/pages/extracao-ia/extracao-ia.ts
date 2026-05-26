@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api';
@@ -26,12 +26,16 @@ export class ExtracaoIaComponent implements OnDestroy {
 
     resultadoIA: any = null;
     mensagemErro = '';
+    mensagemSucesso = ''; 
     inboundJson: any = null;
+    
+    exibirConfirmacao = false; 
 
     private sub: Subscription | null = null;
     private fakeProgressSub: Subscription | null = null;
 
-    constructor(private apiService: ApiService) {}
+    // 🚀 INJETAMOS O CHANGEDETECTORREF AQUI
+    constructor(private apiService: ApiService, private cdr: ChangeDetectorRef) {}
 
     ngOnDestroy(): void {
         this.sub?.unsubscribe();
@@ -44,13 +48,16 @@ export class ExtracaoIaComponent implements OnDestroy {
     }
 
     // =========================
-    // PROCESSAR TEXTO
+    // PROCESSAR TEXTO (Extração Pura)
     // =========================
     processarDocumento(): void {
         if (!this.textoDocumento.trim()) return;
 
         this.iniciarProcessamento();
         this.iniciarFakeProgress();
+        
+        // 🚀 Força o Angular a mostrar o loading imediatamente
+        this.cdr.detectChanges();
 
         const pedido$ = this.modo === 'empresa'
             ? this.apiService.extrairDocumentoIAEmpresa(this.textoDocumento)
@@ -59,12 +66,16 @@ export class ExtracaoIaComponent implements OnDestroy {
         this.sub = pedido$.subscribe({
             next: (resposta) => {
                 this.pararFakeProgress();
-                this.definirResposta(resposta);
+                this.definirRespostaExtracao(resposta);
                 this.pararProcessamento();
+                // 🚀 Força o Angular a mostrar a pré-visualização
+                this.cdr.detectChanges();
             },
             error: (erro) => {
                 this.pararFakeProgress();
                 this.lidarComErro(erro);
+                // 🚀 Força o Angular a mostrar o erro
+                this.cdr.detectChanges();
             }
         });
     }
@@ -77,17 +88,21 @@ export class ExtracaoIaComponent implements OnDestroy {
         if (file) {
             this.ficheiroSelecionado = file;
             this.mensagemErro = '';
+            this.cdr.detectChanges(); // Atualiza nome do ficheiro selecionado
         }
     }
 
     // =========================
-    // UPLOAD — chamada simples sem reportProgress
+    // UPLOAD (Extração Pura)
     // =========================
     processarUpload(): void {
         if (!this.ficheiroSelecionado) return;
 
         this.iniciarProcessamento();
         this.iniciarFakeProgress();
+        
+        // 🚀 Força o Angular a mostrar o loading e começar a barra
+        this.cdr.detectChanges();
 
         const pedido$ = this.modo === 'empresa'
             ? this.apiService.uploadDocumentoIAEmpresa(this.ficheiroSelecionado)
@@ -96,22 +111,63 @@ export class ExtracaoIaComponent implements OnDestroy {
         this.sub = pedido$.subscribe({
             next: (resposta) => {
                 this.pararFakeProgress();
-                this.definirResposta(resposta);
+                this.definirRespostaExtracao(resposta);
                 this.progressoUpload = 100;
                 this.ficheiroSelecionado = null;
                 this.pararProcessamento();
+                
+                // 🚀 Força o Angular a mostrar o botão de Aceitar/Negar
+                this.cdr.detectChanges();
             },
             error: (erro) => {
                 this.pararFakeProgress();
                 this.lidarComErro(erro);
+                this.cdr.detectChanges();
             }
         });
     }
 
     // =========================
+    // CONFIRMAR E GRAVAR NA BD
+    // =========================
+    confirmarGravacao(): void {
+        if (!this.inboundJson) return;
+
+        this.iniciarProcessamento();
+        this.exibirConfirmacao = false; 
+        this.cdr.detectChanges(); // Atualiza UI para modo de gravação
+
+        const payload = { inbound_json: this.inboundJson };
+
+        this.sub = this.apiService.confirmarEGravarBD(payload).subscribe({
+            next: (resposta) => {
+                this.pararProcessamento();
+                this.resultadoIA = resposta; 
+                this.mensagemSucesso = resposta.mensagem || 'Dados gravados com sucesso!';
+                this.cdr.detectChanges(); // Atualiza UI mostrando os cartões de sucesso
+            },
+            error: (erro) => {
+                this.pararProcessamento();
+                this.lidarComErro(erro);
+                this.exibirConfirmacao = true; 
+                this.cdr.detectChanges();
+            }
+        });
+    }
+
+    negarGravacao(): void {
+        this.limparResultado();
+        this.mensagemSucesso = "Extração descartada pelo utilizador.";
+        this.cdr.detectChanges();
+        
+        setTimeout(() => {
+            this.mensagemSucesso = '';
+            this.cdr.detectChanges();
+        }, 4000);
+    }
+
+    // =========================
     // FAKE PROGRESS
-    // Avança até 90% enquanto aguarda resposta do servidor.
-    // O salto para 100% é feito manualmente ao receber resposta.
     // =========================
     private iniciarFakeProgress(): void {
         this.progressoUpload = 0;
@@ -119,9 +175,11 @@ export class ExtracaoIaComponent implements OnDestroy {
         this.fakeProgressSub = interval(600)
             .pipe(takeWhile(() => this.progressoUpload < 90))
             .subscribe(() => {
-                // desacelera à medida que se aproxima de 90%
                 const restante = 90 - this.progressoUpload;
                 this.progressoUpload += Math.max(1, Math.floor(restante * 0.12));
+                
+                // 🚀 Isto é o que faz a barra azul mover-se sem precisares de clicar em nada!
+                this.cdr.detectChanges();
             });
     }
 
@@ -129,13 +187,11 @@ export class ExtracaoIaComponent implements OnDestroy {
         this.fakeProgressSub?.unsubscribe();
         this.fakeProgressSub = null;
     }
-// =========================
-    // RESPOSTA (Versão Corrigida e Flexível)
+
     // =========================
-    private definirResposta(resposta: any): void {
-        this.resultadoIA = resposta;
-        
-        // Tenta apanhar o inbound quer venha em snake_case, camelCase ou dentro do objeto de dados
+    // RESPOSTA EXTRAÇÃO (Pre-Gravação)
+    // =========================
+    private definirRespostaExtracao(resposta: any): void {
         this.inboundJson = 
             resposta?.inbound_json || 
             resposta?.inboundJson || 
@@ -143,7 +199,13 @@ export class ExtracaoIaComponent implements OnDestroy {
             resposta?.dados?.inboundJson || 
             null;
 
-        console.log('📦 Inbound JSON capturado no Frontend:', this.inboundJson);
+        console.log('📦 Inbound JSON Extraído:', this.inboundJson);
+
+        if (this.inboundJson) {
+            this.exibirConfirmacao = true; 
+        } else {
+            this.lidarComErro({ error: { erro: "O motor de IA não devolveu um JSON de inbound válido." }});
+        }
     }
 
     // =========================
@@ -152,8 +214,8 @@ export class ExtracaoIaComponent implements OnDestroy {
     private iniciarProcessamento(): void {
         this.aProcessar = true;
         this.resultadoIA = null;
-        this.inboundJson = null;
         this.mensagemErro = '';
+        this.mensagemSucesso = '';
         this.progressoUpload = 0;
     }
 
@@ -162,33 +224,36 @@ export class ExtracaoIaComponent implements OnDestroy {
     }
 
     // =========================
-    // ERROS
+    // ERROS E LIMPEZA
     // =========================
     private lidarComErro(erro: any): void {
         console.error('ERRO IA:', erro);
         this.mensagemErro =
             erro?.error?.erro ||
             erro?.error?.mensagem ||
-            'Erro ao processar documento com IA.';
+            'Erro ao comunicar com o motor inteligente.';
         this.progressoUpload = 0;
         this.aProcessar = false;
     }
 
-    // =========================
-    // UI HELPERS
-    // =========================
     limparResultado(): void {
         this.sub?.unsubscribe();
         this.pararFakeProgress();
         this.resultadoIA = null;
         this.inboundJson = null;
         this.mensagemErro = '';
+        this.mensagemSucesso = '';
         this.progressoUpload = 0;
         this.ficheiroSelecionado = null;
         this.aProcessar = false;
+        this.exibirConfirmacao = false;
         this.textoDocumento = '';
+        this.cdr.detectChanges(); // Limpa o ecrã instantaneamente
     }
 
+    // =========================
+    // UI HELPERS
+    // =========================
     formatarJson(obj: any): string {
         return JSON.stringify(obj, null, 2);
     }
@@ -196,17 +261,14 @@ export class ExtracaoIaComponent implements OnDestroy {
     descarregarInbound(): void {
         if (!this.inboundJson) return;
 
-        // 🚀 1. Extrair os dados de identificação do objeto JSON
         const entidade = this.inboundJson.meta?.entidade?.id_entidade || 'ENTIDADE';
         const tipoDoc = this.inboundJson.meta?.documento?.tipo_documento || 'DOC';
         const numDoc = this.inboundJson.meta?.documento?.numero_documento || 'SEM_NUMERO';
 
-        // 🧼 2. Limpar caracteres que o sistema operativo não aceita em nomes de ficheiros
         const nomeFicheiroLimpo = `${entidade}_${tipoDoc}_${numDoc}`
-            .replace(/[\\/:*?"<>| ]/g, '_') // Substitui espaços e símbolos por underscores
+            .replace(/[\\/:*?"<>| ]/g, '_')
             .toUpperCase();
 
-        // 📄 3. Criar o processo normal de download com o novo nome dinâmico
         const blob = new Blob(
             [JSON.stringify(this.inboundJson, null, 2)],
             { type: 'application/json' }
@@ -215,7 +277,6 @@ export class ExtracaoIaComponent implements OnDestroy {
         const a = document.createElement('a');
         a.href = url;
         
-        // Define o nome dinâmico aqui (ex: ENT_CIMENTOS_FATURA_2026_99.json)
         a.download = `INBOUND_${nomeFicheiroLimpo}.json`; 
         
         a.click();

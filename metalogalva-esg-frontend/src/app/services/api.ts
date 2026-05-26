@@ -11,6 +11,11 @@ export class ApiService {
 
 	constructor(private http: HttpClient) {}
 
+	
+	confirmarEGravarBD(payload: { inbound_json: any }): Observable<any> {
+		return this.http.post(`${this.apiUrl}/ia/confirmar`, payload);
+	}
+	
 	// ── Fornecedor ────────────────────────────────────────
 
 	extrairDocumentoIA(textoDocumento: string): Observable<any> {

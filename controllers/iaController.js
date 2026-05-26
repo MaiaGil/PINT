@@ -9,7 +9,7 @@ const Periodo = require("../models/periodoModel");
 const Documento = require("../models/documentoModel");
 const Dado = require("../models/dadoModel");
 const Metrica = require("../models/metricaModel"); 
-const UnidadeMedida = require("../models/unidadeMedidaModel");
+const UnidadeMedida = require("../models/unidadeMedidaModel"); // Usa o nome exato do teu model
 
 let pdf;
 try {
@@ -28,12 +28,6 @@ const timeout = (ms) =>
 const limparTexto = (t) => {
     log("limparTexto");
     return !t ? "" : t.replace(/\s+/g, " ").trim().substring(0, 20000);
-};
-
-const gerarId = (p) => {
-    const id = `${p}_${uuidv4()}`;
-    log(`gerarId -> ${id}`);
-    return id;
 };
 
 const extrairTextoFicheiro = async (file) => {
@@ -62,7 +56,7 @@ const extrairTextoFicheiro = async (file) => {
 };
 
 // ─────────────────────────────────────────────
-// CONFIGURAÇÕES GERAIS DE SEGURANÇA
+// CONFIGURAÇÕES GERAIS DE SEGURANÇA E PROMPTS
 // ─────────────────────────────────────────────
 
 const METALOGALVA = {
@@ -73,15 +67,10 @@ const METALOGALVA = {
     nif: "500123456"
 };
 
-// 🚀 Lista de Segurança (Fallback para evitar rebentar o base de dados)
 const TIPOS_DOCUMENTO_VALIDOS = [
     "FATURA", "EPD", "RELATORIO_AUDITORIA", 
     "RELATORIO_ESG", "XML", "JSON", "ERP", "API", "OUTRO"
 ];
-
-// ─────────────────────────────────────────────
-// PROMPTS BASE
-// ─────────────────────────────────────────────
 
 const SYSTEM_PROMPT_BASE = `
 Responde APENAS com um JSON válido. Sem markdown. Sem texto adicional. Não inventes dados. Se não souberes, usa null.
@@ -161,7 +150,20 @@ O JSON deve ter EXATAMENTE esta estrutura:
 `.trim();
 
 // ─────────────────────────────────────────────
-// FUNÇÕES DA IA
+// FUNÇÕES AUXILIARES
+// ─────────────────────────────────────────────
+
+// Limpa pontuação, espaços e maiúsculas para comparar entidades (Fuzzy Matching)
+const normalizarNome = (nome) => {
+    if (!nome) return "";
+    return nome
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[^a-zA-Z0-9]/g, "") // Remove tudo o que não for letra ou número
+        .toLowerCase();
+};
+
+// ─────────────────────────────────────────────
+// EXTRAÇÃO E GERAÇÃO DE INBOUND (Sem gravar)
 // ─────────────────────────────────────────────
 
 const gerarInboundIA = async (texto, nome = null) => {
@@ -189,10 +191,11 @@ const gerarInboundIA = async (texto, nome = null) => {
     let r = {};
     try { 
         r = JSON.parse(c.choices[0].message.content || "{}"); 
+        
+        // 🚀 FILTRO ANTI-METALOGALVA
         const nomeEntidadeAI = r?.meta?.entidade?.nome || "";
         if (nomeEntidadeAI.toLowerCase().includes("metalogalva")) {
-            log("⚠️ A IA tentou usar Metalogalva como fornecedor. Forçando modo de busca alternativa.");
-            // Aqui podes tentar limpar o nome ou forçar um erro que obrigue a IA a reprocessar
+            log("⚠️ A IA tentou usar Metalogalva como fornecedor. Forçando entidade desconhecida.");
             r.meta.entidade.nome = "FORNECEDOR_NAO_IDENTIFICADO"; 
         }
     } catch { 
@@ -201,14 +204,32 @@ const gerarInboundIA = async (texto, nome = null) => {
 
     const nomeEntidadeAI = r?.meta?.entidade?.nome || "UNKNOWN";
     
+    // 🚀 FUZZY MATCHING PARA ENTIDADES
     let idEnt = "";
-    const entidadeExistente = await Entidade.findOne({ nome: { $regex: new RegExp(`^${nomeEntidadeAI.trim()}$`, "i") } });
+    let nomeEntidadeFinal = nomeEntidadeAI.trim();
     
-    if (entidadeExistente) {
-        idEnt = entidadeExistente.id_entidade;
-    } else {
-        if (nomeEntidadeAI.toLowerCase().includes("metalogalva")) {
-            idEnt = "ent_metalogalva";
+    const aiNorm = normalizarNome(nomeEntidadeAI);
+    const todasEntidades = await Entidade.find({}, 'id_entidade nome');
+    
+    let encontrouMatch = false;
+
+    // Procura se a Entidade "Transmaia" está dentro de "Transmaia Trofa" ou vice versa
+    for (let ent of todasEntidades) {
+        let bdNorm = normalizarNome(ent.nome);
+        if (aiNorm.length > 3 && bdNorm.length > 3) {
+            if (aiNorm.includes(bdNorm) || bdNorm.includes(aiNorm)) {
+                idEnt = ent.id_entidade;
+                nomeEntidadeFinal = ent.nome; // Mantém o nome oficial da BD
+                encontrouMatch = true;
+                log(`✅ Fuzzy Match: AI enviou '${nomeEntidadeAI}', BD assumiu '${ent.nome}'`);
+                break;
+            }
+        }
+    }
+
+    if (!encontrouMatch) {
+        if (nomeEntidadeAI === "FORNECEDOR_NAO_IDENTIFICADO") {
+            idEnt = `ENT_DESCONHECIDO_${uuidv4().substring(0, 4)}`;
         } else {
             const nomeLimpo = nomeEntidadeAI
                 .trim()
@@ -217,7 +238,6 @@ const gerarInboundIA = async (texto, nome = null) => {
                 .replace(/\b(SA|S\.A\.|LDA|Lda|LIMITADA|SLA|S\.L\.)\b/gi, "") 
                 .replace(/\s+/g, "_")                              
                 .toUpperCase();                                  
-                
             const sufixoSlug = nomeLimpo || "CUSTOM";
             idEnt = `ENT_${sufixoSlug}`;
         }
@@ -231,29 +251,27 @@ const gerarInboundIA = async (texto, nome = null) => {
         const partes = dataInicio.split('-'); 
         const ano = partes[0];
         const mes = partes[1];
-        
         if (tipoPeriodo.toUpperCase() === "MENSAL") {
             idPer = `per_${ano}_M${mes}`; 
         } else if (tipoPeriodo.toUpperCase() === "TRIMESTRAL") {
-            const numMes = parseInt(mes, 10);
-            const tri = Math.ceil(numMes / 3); 
+            const tri = Math.ceil(parseInt(mes, 10) / 3); 
             idPer = `per_${ano}_T${tri}`; 
         } else {
             idPer = `per_${ano}_ANUAL`;   
         }
     } else {
-        idPer = gerarId("per"); 
+        idPer = `per_${uuidv4().substring(0, 8)}`; 
     }
 
-    const idDoc = gerarId("doc");
-    const agora = new Date().toISOString();
-
-    // 🚀 SANITIZAÇÃO DE SEGURANÇA: Impede que tipos alucinados quebrem a BD
+    // 🚀 SANITIZAÇÃO DE TIPO DE DOCUMENTO
     let tipoDocIA = r?.meta?.documento?.tipo_documento || "OUTRO";
     if (!TIPOS_DOCUMENTO_VALIDOS.includes(tipoDocIA)) {
-        log(`Aviso: IA tentou usar tipo inválido '${tipoDocIA}'. Forçado para 'OUTRO'.`);
         tipoDocIA = "OUTRO";
     }
+
+    // 🚀 ID DE DOCUMENTO SEMÂNTICO
+    const idDoc = `doc_${tipoDocIA.toLowerCase()}_${uuidv4().substring(0, 6)}`;
+    const agora = new Date().toISOString();
 
     return {
         meta: {
@@ -265,9 +283,9 @@ const gerarInboundIA = async (texto, nome = null) => {
                 fonte_ingestao: "UPLOAD",
                 ficheiro_origem: nome || null
             },
-            entidade: idEnt === "ent_metalogalva" ? METALOGALVA : {
+            entidade: {
                 id_entidade: idEnt,
-                nome: entidadeExistente ? entidadeExistente.nome : nomeEntidadeAI.trim(),
+                nome: nomeEntidadeFinal,
                 tipo_entidade: r?.meta?.entidade?.tipo_entidade || "OUTRO",
                 pais: r?.meta?.entidade?.pais || null,
                 nif: r?.meta?.entidade?.nif || null
@@ -280,21 +298,28 @@ const gerarInboundIA = async (texto, nome = null) => {
             },
             versao_schema: "1.0.0"
         },
-        dados: (r?.dados || []).map((d) => ({
-            id_dado: gerarId("dad"),
-            id_documento: idDoc,
-            id_metrica: d?.id_metrica || null,
-            id_unidade_original: d?.id_unidade_original || null,
-            id_unidade_base_esperada: d?.id_unidade_base_esperada || null,
-            id_fator: null,
-            valor: Number(d?.valor) || 0,
-            id_entidade: idEnt,
-            id_periodo: idPer,
-            origem: "EXTRACAO_IA",
-            estado_validacao: "PENDENTE",
-            data_registo: agora,
-            observacao: d?.observacao || null
-        }))
+        dados: (r?.dados || []).map((d) => {
+            // 🚀 ID DE DADOS SEMÂNTICO (dado_metrica_unidade_hash)
+            const slugMetrica = (d?.id_metrica || "desconhecido").toLowerCase().replace(/\s+/g, '_');
+            const slugUnidade = (d?.id_unidade_original || "ud").toLowerCase().replace(/\s+/g, '');
+            const idDadoSemantico = `dado_${slugMetrica}_${slugUnidade}_${uuidv4().substring(0, 4)}`;
+
+            return {
+                id_dado: idDadoSemantico,
+                id_documento: idDoc,
+                id_metrica: d?.id_metrica || null,
+                id_unidade_original: d?.id_unidade_original || null,
+                id_unidade_base_esperada: d?.id_unidade_base_esperada || null,
+                id_fator: null,
+                valor: Number(d?.valor) || 0,
+                id_entidade: idEnt,
+                id_periodo: idPer,
+                origem: "EXTRACAO_IA",
+                estado_validacao: "PENDENTE",
+                data_registo: agora,
+                observacao: d?.observacao || null
+            };
+        })
     };
 };
 
@@ -331,29 +356,26 @@ const gerarInboundIAEmpresa = async (texto, nome = null) => {
         const partes = dataInicio.split('-'); 
         const ano = partes[0];
         const mes = partes[1];
-        
         if (tipoPeriodo.toUpperCase() === "MENSAL") {
             idPer = `per_${ano}_M${mes}`; 
         } else if (tipoPeriodo.toUpperCase() === "TRIMESTRAL") {
-            const numMes = parseInt(mes, 10);
-            const tri = Math.ceil(numMes / 3);
+            const tri = Math.ceil(parseInt(mes, 10) / 3);
             idPer = `per_${ano}_T${tri}`; 
         } else {
             idPer = `per_${ano}_ANUAL`;   
         }
     } else {
-        idPer = gerarId("per"); 
+        idPer = `per_${uuidv4().substring(0, 8)}`; 
     }
     
-    const idDoc = gerarId("doc");
-    const agora = new Date().toISOString();
-
-    // 🚀 SANITIZAÇÃO DE SEGURANÇA: Impede que tipos alucinados quebrem a BD
     let tipoDocIA = r?.meta?.documento?.tipo_documento || "OUTRO";
     if (!TIPOS_DOCUMENTO_VALIDOS.includes(tipoDocIA)) {
-        log(`Aviso: IA tentou usar tipo inválido '${tipoDocIA}'. Forçado para 'OUTRO'.`);
         tipoDocIA = "OUTRO";
     }
+
+    // 🚀 ID DE DOCUMENTO SEMÂNTICO
+    const idDoc = `doc_${tipoDocIA.toLowerCase()}_${uuidv4().substring(0, 6)}`;
+    const agora = new Date().toISOString();
 
     return {
         meta: {
@@ -374,30 +396,37 @@ const gerarInboundIAEmpresa = async (texto, nome = null) => {
             },
             versao_schema: "1.0.0"
         },
-        dados: (r?.dados || []).map((d) => ({
-            id_dado: gerarId("dad"),
-            id_documento: idDoc,
-            id_metrica: d?.id_metrica || null,
-            id_unidade_original: d?.id_unidade_original || null,
-            id_unidade_base_esperada: d?.id_unidade_base_esperada || null,
-            id_fator: null,
-            valor: Number(d?.valor) || 0,
-            id_entidade: METALOGALVA.id_entidade,
-            id_periodo: idPer,
-            origem: "EXTRACAO_IA",
-            estado_validacao: "PENDENTE",
-            data_registo: agora,
-            observacao: d?.observacao || null
-        }))
+        dados: (r?.dados || []).map((d) => {
+            // 🚀 ID DE DADOS SEMÂNTICO
+            const slugMetrica = (d?.id_metrica || "desconhecido").toLowerCase().replace(/\s+/g, '_');
+            const slugUnidade = (d?.id_unidade_original || "ud").toLowerCase().replace(/\s+/g, '');
+            const idDadoSemantico = `dado_${slugMetrica}_${slugUnidade}_${uuidv4().substring(0, 4)}`;
+
+            return {
+                id_dado: idDadoSemantico,
+                id_documento: idDoc,
+                id_metrica: d?.id_metrica || null,
+                id_unidade_original: d?.id_unidade_original || null,
+                id_unidade_base_esperada: d?.id_unidade_base_esperada || null,
+                id_fator: null,
+                valor: Number(d?.valor) || 0,
+                id_entidade: METALOGALVA.id_entidade,
+                id_periodo: idPer,
+                origem: "EXTRACAO_IA",
+                estado_validacao: "PENDENTE",
+                data_registo: agora,
+                observacao: d?.observacao || null
+            };
+        })
     };
 };
 
 // ─────────────────────────────────────────────
-// 🚀 AUTO-DISCOVERY: GARANTIR MÉTRICAS E UNIDADES
+// AUTO-DISCOVERY & DB SAVING LOGIC
 // ─────────────────────────────────────────────
 
 const garantirDependenciasBase = async (dadosExtraidos) => {
-    log("STEP DB - Verificando e Autocriando Dependências (Métricas e Unidades)");
+    log("STEP DB - Verificando e Autocriando Dependências ÚNICAS (Métricas e Unidades)");
 
     const unitsSet = new Set();
     const metricsMap = new Map();
@@ -415,9 +444,9 @@ const garantirDependenciasBase = async (dadosExtraidos) => {
 
     unitsSet.add('UNIDADE_DESCONHECIDA');
 
+    // Mongoose com upsert impede a duplicação
     for (const u of unitsSet) {
         let tipoInferido = 'MASSA';
-        
         if (u.includes('CO2')) tipoInferido = 'EMISSOES';
         else if (u.includes('WH') || u.includes('JOULE')) tipoInferido = 'ENERGIA';
         else if (u.includes('L') || u.includes('M3')) tipoInferido = 'VOLUME';
@@ -460,12 +489,7 @@ const garantirDependenciasBase = async (dadosExtraidos) => {
     }
 };
 
-// ─────────────────────────────────────────────
-// DB SAVING LOGIC
-// ─────────────────────────────────────────────
-
 const safeUpsert = async (Model, query, data) => {
-    log(`DB UPSERT -> ${Model.modelName}`);
     return Model.findOneAndUpdate(query, data, {
         upsert: true,
         new: true,
@@ -474,7 +498,7 @@ const safeUpsert = async (Model, query, data) => {
 };
 
 const guardarInboundBD = async (i) => {
-    log("STEP DB - início");
+    log("STEP DB - a gravar no banco de dados definitivo...");
 
     if (i.dados && i.dados.length > 0) {
         await garantirDependenciasBase(i.dados);
@@ -499,126 +523,96 @@ const guardarInboundBD = async (i) => {
     );
 
     let dados = [];
-    log("STEP DB - dados");
-
-    try {
-        if (i.dados?.length) {
-            await Dado.deleteMany({ id_documento: i.meta.documento.id_documento });
-            dados = await Dado.insertMany(i.dados);
-        }
-    } catch (e) {
-        log("STEP DB - ERRO insertMany -> " + e.message);
-        throw e;
+    if (i.dados?.length) {
+        await Dado.deleteMany({ id_documento: i.meta.documento.id_documento });
+        dados = await Dado.insertMany(i.dados);
     }
 
-    log("STEP DB - fim");
     return { entidade, periodo, documento, dados };
 };
 
 // ─────────────────────────────────────────────
-// CONTROLLERS
+// CONTROLLERS DE EXTRAÇÃO (AGORA NÃO GRAVAM NA BD!)
 // ─────────────────────────────────────────────
 
 const extrairDadosDocumentoFicheiro = async (req, res) => {
     try {
-        log("REQUEST FILE - início");
         if (!req.file) return res.status(400).json({ sucesso: false, erro: "Ficheiro vazio" });
-
         const texto = await extrairTextoFicheiro(req.file);
         const inbound = await gerarInboundIA(texto, req.file.originalname);
-        const bd = await guardarInboundBD(inbound);
-
-        return res.status(200).json({
-            sucesso: true,
-            mensagem: "OK",
-            inbound_json: inbound,
-            bd_registos: {
-                entidade: bd.entidade.id_entidade,
-                periodo: bd.periodo.id_periodo,
-                documento: bd.documento.id_documento,
-                dados: bd.dados.length
-            }
-        });
+        
+        // Devolve apenas o JSON, aguardando aprovação
+        return res.status(200).json({ sucesso: true, inbound_json: inbound });
     } catch (e) {
-        log("ERROR FILE -> " + e.message);
         return res.status(500).json({ sucesso: false, erro: e.message });
     }
 };
 
 const extrairDadosDocumento = async (req, res) => {
     try {
-        log("REQUEST TEXTO - início");
         const { texto_documento } = req.body;
         if (!texto_documento) return res.status(400).json({ sucesso: false, erro: "Texto obrigatório" });
-
         const inbound = await gerarInboundIA(texto_documento);
-        const bd = await guardarInboundBD(inbound);
-
-        return res.status(200).json({
-            sucesso: true,
-            mensagem: "OK",
-            inbound_json: inbound,
-            bd_registos: {
-                entidade: bd.entidade.id_entidade,
-                periodo: bd.periodo.id_periodo,
-                documento: bd.documento.id_documento,
-                dados: bd.dados.length
-            }
-        });
+        
+        return res.status(200).json({ sucesso: true, inbound_json: inbound });
     } catch (e) {
-        log("ERROR TEXTO -> " + e.message);
         return res.status(500).json({ sucesso: false, erro: e.message });
     }
 };
 
 const extrairDadosDocumentoFicheiroEmpresa = async (req, res) => {
     try {
-        log("REQUEST FILE EMPRESA - início");
         if (!req.file) return res.status(400).json({ sucesso: false, erro: "Ficheiro vazio" });
-
         const texto = await extrairTextoFicheiro(req.file);
         const inbound = await gerarInboundIAEmpresa(texto, req.file.originalname);
-        const bd = await guardarInboundBD(inbound);
-
-        return res.status(200).json({
-            sucesso: true,
-            mensagem: "OK",
-            inbound_json: inbound,
-            bd_registos: {
-                entidade: bd.entidade.id_entidade,
-                periodo: bd.periodo.id_periodo,
-                documento: bd.documento.id_documento,
-                dados: bd.dados.length
-            }
-        });
+        
+        return res.status(200).json({ sucesso: true, inbound_json: inbound });
     } catch (e) {
-        log("ERROR FILE EMPRESA -> " + e.message);
         return res.status(500).json({ sucesso: false, erro: e.message });
     }
 };
 
 const extrairDadosDocumentoEmpresa = async (req, res) => {
     try {
-        log("REQUEST TEXTO EMPRESA - início");
         const { texto_documento } = req.body;
         if (!texto_documento) return res.status(400).json({ sucesso: false, erro: "Texto obrigatório" });
-
         const inbound = await gerarInboundIAEmpresa(texto_documento);
-        const bd = await guardarInboundBD(inbound);
+        
+        return res.status(200).json({ sucesso: true, inbound_json: inbound });
+    } catch (e) {
+        return res.status(500).json({ sucesso: false, erro: e.message });
+    }
+};
+
+// ─────────────────────────────────────────────
+// NOVO CONTROLLER: GRAVAÇÃO DEFINITIVA (Pós-Aceitação)
+// ─────────────────────────────────────────────
+
+const confirmarEGravarBD = async (req, res) => {
+    try {
+        log("REQUEST CONFIRMAR GRAVAÇÃO - início");
+        const { inbound_json } = req.body;
+
+        if (!inbound_json || !inbound_json.meta) {
+            return res.status(400).json({ sucesso: false, erro: "JSON de inbound inválido." });
+        }
+
+        const bd = await guardarInboundBD(inbound_json);
 
         return res.status(200).json({
             sucesso: true,
-            mensagem: "OK",
-            inbound_json: inbound,
+            mensagem: "Dados gravados e integrados com sucesso na Base de Dados.",
             bd_registos: {
                 entidade: bd.entidade.id_entidade,
                 periodo: bd.periodo.id_periodo,
                 documento: bd.documento.id_documento,
+                tipo_documento: bd.documento.tipo_documento, // Correção do bug visual
                 dados: bd.dados.length
             }
         });
+
     } catch (e) {
-        log("ERROR TEXTO EMPRESA -> " + e.message);
+        log("ERROR GRAVAR BD -> " + e.message);
         return res.status(500).json({ sucesso: false, erro: e.message });
     }
 };
@@ -627,5 +621,6 @@ module.exports = {
     extrairDadosDocumento,
     extrairDadosDocumentoFicheiro,
     extrairDadosDocumentoEmpresa,
-    extrairDadosDocumentoFicheiroEmpresa
+    extrairDadosDocumentoFicheiroEmpresa,
+    confirmarEGravarBD // 🚀 Exportado o novo controlador
 };
