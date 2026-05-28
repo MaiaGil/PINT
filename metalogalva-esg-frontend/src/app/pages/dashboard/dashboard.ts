@@ -157,7 +157,7 @@ export class DashboardComponent implements OnInit {
     // 🎯 Dicionário estrito de metas por ID
     const metasExatas: { [key: string]: { valor: number, label: string } } = {
       'kpi_intensidade_de_emissoes_de_carbono_do_transporte': { valor: 1.85, label: 'Meta Indústria: 1.85 tCO₂e/ton' },
-      'kpi_pegada_de_carbono_logistica_por_combustivel': { valor: 100.000, label: 'Teto de Emissões: 100 tCO₂e' },
+      'kpi_pegada_de_carbono_logistica_por_combustivel': { valor: 0.15  , label: 'Teto de Emissões: 0.15 tCO₂e' },
       'kpi_intensidade_carbonica_do_aco': { valor: 1.400, label: 'Meta Indústria: 1.4 tCO₂e/ton' },
       // 🚀 Adicionado suporte para o ID expandido atualizado
       'kpi_intensidade_carbonica_do_aco_adquirido_e_processado': { valor: 1.400, label: 'Meta Indústria: 1.4 tCO₂e/ton' },
@@ -393,7 +393,7 @@ export class DashboardComponent implements OnInit {
       const metricaId = (d.id_metrica || '').toLowerCase();
       const unidade = (d.id_unidade_base_esperada || d.id_unidade_original || '').toUpperCase();
 
-      if (unidade === 'TCO2E' || metricaId.includes('co2') || metricaId.includes('emissao')) {
+      if (unidade === 'tCO2e' || metricaId.includes('co2') || metricaId.includes('emissao')) {
         const valor = d.valor_convertido_base || d.valor || 0;
         if (d.id_entidade === 'ent_metalogalva' || d.origem?.toUpperCase() === 'INTERNO') scope1 += valor;
         else scope3 += valor;
